@@ -25,9 +25,13 @@ function cellRadius(cell: Cell): number {
   return cell.polygon.length ? s / cell.polygon.length : 0.02;
 }
 
-/** Uniform flat elevation (world units) for blocked "wall" cells, so blocked
- * terrain reads as walls and the path/buildable cells as low hallways. */
+/** Uniform flat elevation (world units) for raised cells (buildable platforms +
+ * blocked walls). The path stays at ground as a low hallway. */
 const WALL_HEIGHT = 0.06;
+
+/** Shrink each raised block toward its centre so adjacent blocks leave a gap —
+ * cleaner hallway read and clearance so walking enemies don't clip walls. */
+const BLOCK_INSET = 0.84;
 
 /** point-in-polygon (ray cast), board-space. */
 function pointInPolygon(px: number, py: number, poly: Vec2[]): boolean {
@@ -57,7 +61,8 @@ export class BoardView {
   private mountainStyle: MountainStyle = 'solid';
   private unitsGroup = new THREE.Group();
   private units: Unit[] = [];
-  private unitScale = 0.05;
+  private towerScale = 0.045;
+  private enemyScale = 0.03;
   private clockStart = 0;
   private lastT = 0;
   private raycaster = new THREE.Raycaster();
@@ -101,35 +106,40 @@ export class BoardView {
     this.clearGroup();
     this.clearUnits();
 
-    // Batch cell outlines per terrain into single LineSegments for few draw calls.
-    const buildableSegs: number[] = [];
-    const pathSegs: number[] = [];
-    const mountainSegs: number[] = [];
-    const mountainTris: number[] = [];
+    // buildable = raised green platforms (towers on top); blocked = grey walls;
+    // path/spawn/base = low dark hallway floor. Batched per material.
+    const solid = this.mountainStyle === 'solid';
+    const floorSegs: number[] = [];
+    const buildWire: number[] = [];
+    const buildTris: number[] = [];
+    const blockWire: number[] = [];
+    const blockTris: number[] = [];
 
     for (const cell of board.cells.values()) {
-      if (cell.terrain === 'blocked') {
-        if (this.mountainStyle === 'solid') this.pushMountainSolid(mountainTris, cell);
-        else this.pushMountain(mountainSegs, cell);
-        continue;
-      }
-      const target = cell.terrain === 'path' || cell.terrain === 'spawn' || cell.terrain === 'base'
-        ? pathSegs
-        : buildableSegs;
-      const poly = cell.polygon;
-      for (let i = 0; i < poly.length; i++) {
-        const a = toWorld(poly[i]!);
-        const b = toWorld(poly[(i + 1) % poly.length]!);
-        target.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+      if (cell.terrain === 'buildable') {
+        if (solid) this.pushBlockSolid(buildTris, cell);
+        else this.pushBlockWire(buildWire, cell);
+      } else if (cell.terrain === 'blocked') {
+        if (solid) this.pushBlockSolid(blockTris, cell);
+        else this.pushBlockWire(blockWire, cell);
+      } else {
+        // path / spawn / base — low floor outline (the hallway enemies walk)
+        const poly = cell.polygon;
+        for (let i = 0; i < poly.length; i++) {
+          const a = toWorld(poly[i]!);
+          const b = toWorld(poly[(i + 1) % poly.length]!);
+          floorSegs.push(a[0], 0, a[2], b[0], 0, b[2]);
+        }
       }
     }
 
-    this.addLineSegments(buildableSegs, THEME.buildable, THEME.buildableDim);
-    this.addLineSegments(pathSegs, THEME.path, 1.0);
-    this.addLineSegments(mountainSegs, THEME.mountainWire, 0.95);
-    this.addSolidMountains(mountainTris);
+    this.addLineSegments(floorSegs, THEME.hallway, 0.5);
+    this.addLineSegments(buildWire, THEME.buildWire, 0.85);
+    this.addLineSegments(blockWire, THEME.mountainWire, 0.9);
+    this.addSolidBlocks(buildTris, THEME.buildSolid);
+    this.addSolidBlocks(blockTris, THEME.mountainSolid);
 
-    // Accent markers for spawn(s) and base — small upright rings.
+    // Accent markers for spawn(s) and base — small rings on the hallway floor.
     for (const s of board.spawns) this.addMarker(board.cells.get(s)!, THEME.spawn);
     this.addMarker(board.cells.get(board.base)!, THEME.base);
   }
@@ -148,48 +158,54 @@ export class BoardView {
     this.disposables.push(geo, mat);
   }
 
-  /** Wireframe wall: the cell polygon at ground + a flat top ring at WALL_HEIGHT,
-   * joined by vertical ribs. Flat top (not a peak) reads as a raised block. */
-  private pushMountain(target: number[], cell: Cell): void {
+  /** Inset a cell-polygon vertex toward the cell centre (BLOCK_INSET), then to
+   * world XZ — leaves a gap between adjacent raised blocks. */
+  private insetWorld(cell: Cell, p: Vec2): [number, number, number] {
+    const bx = cell.center[0] + (p[0] - cell.center[0]) * BLOCK_INSET;
+    const by = cell.center[1] + (p[1] - cell.center[1]) * BLOCK_INSET;
+    return toWorld([bx, by]);
+  }
+
+  /** Wireframe raised block: inset base ring + flat top ring at WALL_HEIGHT,
+   * joined by vertical ribs. */
+  private pushBlockWire(target: number[], cell: Cell): void {
     const poly = cell.polygon;
     const n = poly.length;
     if (n < 3) return;
     const H = WALL_HEIGHT;
     for (let i = 0; i < n; i++) {
-      const a = toWorld(poly[i]!);
-      const b = toWorld(poly[(i + 1) % n]!);
+      const a = this.insetWorld(cell, poly[i]!);
+      const b = this.insetWorld(cell, poly[(i + 1) % n]!);
       target.push(a[0], 0, a[2], b[0], 0, b[2]); // base edge
-      target.push(a[0], H, a[2], b[0], H, b[2]); // top edge (flat)
+      target.push(a[0], H, a[2], b[0], H, b[2]); // flat top edge
       target.push(a[0], 0, a[2], a[0], H, a[2]); // vertical rib
     }
   }
 
-  /** Solid wall: vertical side quads (2 tris/edge) + a flat top cap (fan from the
+  /** Solid raised block: side quads (2 tris/edge) + flat top cap (fan from the
    * cell centre). DoubleSide material makes winding irrelevant. */
-  private pushMountainSolid(target: number[], cell: Cell): void {
+  private pushBlockSolid(target: number[], cell: Cell): void {
     const poly = cell.polygon;
     const n = poly.length;
     if (n < 3) return;
     const H = WALL_HEIGHT;
     const c = toWorld(cell.center);
     for (let i = 0; i < n; i++) {
-      const a = toWorld(poly[i]!);
-      const b = toWorld(poly[(i + 1) % n]!);
-      // side wall (ground a→b up to top a→b)
+      const a = this.insetWorld(cell, poly[i]!);
+      const b = this.insetWorld(cell, poly[(i + 1) % n]!);
       target.push(a[0], 0, a[2], b[0], 0, b[2], b[0], H, b[2]);
       target.push(a[0], 0, a[2], b[0], H, b[2], a[0], H, a[2]);
-      // flat top cap triangle (centre → edge)
       target.push(c[0], H, c[2], a[0], H, a[2], b[0], H, b[2]);
     }
   }
 
-  private addSolidMountains(positions: number[]): void {
+  private addSolidBlocks(positions: number[], color: number): void {
     if (positions.length === 0) return;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geo.computeVertexNormals();
     const mat = new THREE.MeshStandardMaterial({
-      color: THEME.mountainSolid,
+      color,
       roughness: 0.85,
       metalness: 0.0,
       side: THREE.DoubleSide,
@@ -213,9 +229,9 @@ export class BoardView {
     const cell = this.board.cells.get(cellId);
     const def = UNIT_BY_KEY[key];
     if (!cell || !def || def.family !== 'tower') return null;
-    const u = new Unit(def, this.unitScale, this.units.length);
+    const u = new Unit(def, this.towerScale, this.units.length);
     const w = toWorld(cell.center);
-    u.placeAt(w[0], w[2]);
+    u.placeAt(w[0], w[2], WALL_HEIGHT); // on top of the raised buildable platform
     this.unitsGroup.add(u.object);
     this.units.push(u);
     return def.label;
@@ -231,7 +247,7 @@ export class BoardView {
       return new THREE.Vector3(w[0], 0, w[2]);
     });
     if (pts.length < 2) return null;
-    const e = new Enemy(def, this.unitScale, this.units.length, pts, 0.11);
+    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.11);
     this.unitsGroup.add(e.object);
     this.units.push(e);
     return def.label;

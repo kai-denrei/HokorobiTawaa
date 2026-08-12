@@ -47,6 +47,7 @@ export class Unit {
   protected readonly baseScale: number;
   protected readonly restY: number;
   protected readonly phase: number;
+  protected baseY = 0;
 
   constructor(readonly def: UnitDef, scale: number, seedIndex: number) {
     const shape = SHAPES[def.key]!;
@@ -95,14 +96,15 @@ export class Unit {
     }
   }
 
-  /** Static placement (towers). */
-  placeAt(worldX: number, worldZ: number): void {
-    this.object.position.set(worldX, this.restY, worldZ);
+  /** Static placement (towers). `baseY` lifts the unit onto a platform top. */
+  placeAt(worldX: number, worldZ: number, baseY = 0): void {
+    this.baseY = baseY;
+    this.object.position.set(worldX, baseY + this.restY, worldZ);
   }
 
   update(_dt: number, elapsed: number): void {
     this.pose(elapsed);
-    this.object.position.y = this.restY + this.bob(elapsed);
+    this.object.position.y = this.baseY + this.restY + this.bob(elapsed);
   }
 
   dispose(): void {
@@ -143,7 +145,7 @@ export class Enemy extends Unit {
     this.pose(elapsed);
     this.object.position.set(
       a.x + (b.x - a.x) * f,
-      this.restY + this.bob(elapsed),
+      this.baseY + this.restY + this.bob(elapsed),
       a.z + (b.z - a.z) * f,
     );
   }

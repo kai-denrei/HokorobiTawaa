@@ -2,6 +2,17 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Platforms & hallways
+
+- Reworked the spatial model: buildable cells are now raised green **platforms**
+  (towers placed on top, elevated to WALL_HEIGHT), blocked cells are grey walls,
+  and the path is a **dark low hallway** (dim floor) the enemies walk between them.
+- Raised blocks are inset toward their centre (BLOCK_INSET) so adjacent blocks
+  leave a gap — cleaner corridor read and clearance.
+- Collision fix: enemies shrunk (enemyScale 0.03) and the inset gap keep walking
+  enemies inside the hallway channel instead of clipping into wall geometry.
+  Towers use towerScale 0.045 and sit on the platform tops.
+
 ## 2026-08-12 — Units (spawn test, no gameplay)
 
 - Ported Braille "Fun Shapes" point-cloud generators (Thinking Orbs engine,
