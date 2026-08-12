@@ -50,7 +50,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   // --- top bar -------------------------------------------------------------
   const top = el('div', 'hk-top');
   const title = el('div', 'hk-title');
-  title.innerHTML = '<span class="hk-kanji">繕</span> HokorobiTawaa';
+  title.innerHTML = '<span class="hk-kanji">綻</span> HokorobiTawaa <span class="hk-kanji">塔</span>';
   const badge = el('button', 'hk-badge');
   badge.innerHTML = `<span class="hk-badge-dot"></span>v${BUILD.version}<span class="hk-badge-token">${BUILD.token}</span>`;
   badge.title = 'Build version — open Dev Log & Rules';
@@ -160,7 +160,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const titleScreen = el('div', 'hk-title');
   const titleInner = el('div', 'hk-title-inner');
   const titleName = el('div', 'hk-title-name');
-  titleName.innerHTML = '<span class="hk-kanji">繕</span> HokorobiTawaa';
+  titleName.innerHTML = '<span class="hk-kanji">綻</span> HokorobiTawaa <span class="hk-kanji">塔</span>';
   const titleTag = el('div', 'hk-title-tag', 'procedural wireframe tower defense');
   const playBtn = el('button', 'hk-play', '▶ PLAY');
   playBtn.addEventListener('click', () => handlers.onPlay());

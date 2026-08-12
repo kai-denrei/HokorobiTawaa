@@ -5,7 +5,7 @@ Status: Approved for planning
 
 ## 1. What this is
 
-HokorobiTawaa (繕い) is a mobile-first PWA tower-defense game: fixed-path
+HokorobiTawaa (綻びタワー塔) is a mobile-first PWA tower-defense game: fixed-path
 combat on a procedurally generated organic (Stålberg) board, rendered in a
 monochrome green-on-black retro vector-wireframe style. Two visually distinct
 unit families (mechanical towers, static; organic/aquatic enemies, animated)
