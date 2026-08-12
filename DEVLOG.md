@@ -2,6 +2,19 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Varied attack patterns (projectiles)
+
+- Towers no longer all hitscan. Each has an `attack` type + a pooled projectile
+  system (single THREE.Points cloud, per-vertex colour, drawRange):
+  - single — straight bullet (Pine Tree, Spiral rapid-fire)
+  - spread — N-pellet fan (SONGS Domes)
+  - homing — steers toward the moving target (Double Spiral, DNA)
+  - mortar — ballistic arc under gravity, splash damage on impact (Gear)
+  - beam — instant hitscan line (Teardrop sniper)
+- Projectiles travel, detect proximity hits, apply damage (mortar = AoE within
+  splash radius), and expire on TTL. Cleared on regenerate.
+- Verified headless: bullet streams/arcs in flight, enemies take damage, 0 errors.
+
 ## 2026-08-12 — Core loop: lives, waves, timers, win/lose
 
 - Enemies now walk the path ONCE (no looping); reaching the base sets reachedEnd.

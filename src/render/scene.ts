@@ -11,10 +11,24 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { Board, Cell, Vec2 } from '../board';
 import { THEME, BLOOM } from './theme';
-import { Unit, Enemy } from '../units/unit';
+import { Unit, Enemy, dotTexture } from '../units/unit';
 import { UNIT_BY_KEY } from '../units/roster';
 
 export type MountainStyle = 'wire' | 'solid';
+
+const MAX_PROJ = 512;
+
+type Projectile = {
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  kind: 'single' | 'homing' | 'mortar';
+  target: Enemy | null;
+  damage: number;
+  splash: number;
+  gravity: number;
+  ttl: number;
+  color: THREE.Color;
+};
 
 const toWorld = (p: Vec2): [number, number, number] => [p[0] - 0.5, 0, p[1] - 0.5];
 
@@ -65,6 +79,12 @@ export class BoardView {
   private enemies: Enemy[] = [];
   private effectsGroup = new THREE.Group();
   private effects: { line: THREE.Line; mat: THREE.LineBasicMaterial; ttl: number; max: number }[] = [];
+  private projectiles: Projectile[] = [];
+  private projGeo = new THREE.BufferGeometry();
+  private projPos = new Float32Array(MAX_PROJ * 3);
+  private projCol = new Float32Array(MAX_PROJ * 3);
+  private projPoints: THREE.Points;
+  private tmp = new THREE.Vector3();
   private towerScale = 0.045;
   private enemyScale = 0.03;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
@@ -85,6 +105,25 @@ export class BoardView {
     this.scene.add(this.boardGroup);
     this.scene.add(this.unitsGroup);
     this.scene.add(this.effectsGroup);
+
+    // pooled projectile point cloud (positions/colours updated per frame)
+    this.projGeo.setAttribute('position', new THREE.BufferAttribute(this.projPos, 3).setUsage(THREE.DynamicDrawUsage));
+    this.projGeo.setAttribute('color', new THREE.BufferAttribute(this.projCol, 3).setUsage(THREE.DynamicDrawUsage));
+    this.projGeo.setDrawRange(0, 0);
+    this.projPoints = new THREE.Points(
+      this.projGeo,
+      new THREE.PointsMaterial({
+        size: 0.022,
+        map: dotTexture(),
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      }),
+    );
+    this.projPoints.frustumCulled = false;
+    this.effectsGroup.add(this.projPoints);
 
     // Lighting only affects the solid (Standard-material) mountains; the
     // wireframe board uses LineBasicMaterial and ignores lights entirely.
@@ -278,6 +317,8 @@ export class BoardView {
       e.mat.dispose();
     }
     this.effects = [];
+    this.projectiles = [];
+    this.projGeo.setDrawRange(0, 0);
   }
 
   get unitCount(): number {
@@ -311,11 +352,126 @@ export class BoardView {
         }
       }
       if (best) {
-        best.damage(dmg);
         t.cooldown = 1 / rate;
-        this.spawnBolt(tp, best.object.position);
+        const atk = t.def.attack ?? 'single';
+        const color = new THREE.Color(t.def.color);
+        const target = best.object.position;
+        if (atk === 'beam') {
+          best.damage(dmg); // instant hitscan
+          this.spawnBolt(tp, target);
+        } else if (atk === 'mortar') {
+          this.fireMortar(tp, target, dmg, t.def.splash ?? 0.06, color);
+        } else if (atk === 'spread') {
+          this.fireSpread(tp, target, dmg, t.def.projSpeed ?? 0.7, t.def.pellets ?? 5, color);
+        } else if (atk === 'homing') {
+          this.fireHoming(tp, best, dmg, t.def.projSpeed ?? 0.6, color);
+        } else {
+          this.fireStraight(tp, target, dmg, t.def.projSpeed ?? 0.9, color);
+        }
       }
     }
+  }
+
+  private pushProj(p: Projectile): void {
+    if (this.projectiles.length < MAX_PROJ) this.projectiles.push(p);
+  }
+
+  private fireStraight(from: THREE.Vector3, toPos: THREE.Vector3, dmg: number, speed: number, color: THREE.Color): void {
+    const dir = new THREE.Vector3().subVectors(toPos, from);
+    const l = dir.length() || 1;
+    dir.multiplyScalar(speed / l);
+    this.pushProj({ pos: from.clone(), vel: dir, kind: 'single', target: null, damage: dmg, splash: 0, gravity: 0, ttl: 2, color });
+  }
+
+  private fireHoming(from: THREE.Vector3, target: Enemy, dmg: number, speed: number, color: THREE.Color): void {
+    const dir = new THREE.Vector3().subVectors(target.object.position, from);
+    const l = dir.length() || 1;
+    dir.multiplyScalar(speed / l);
+    this.pushProj({ pos: from.clone(), vel: dir, kind: 'homing', target, damage: dmg, splash: 0, gravity: 0, ttl: 3, color });
+  }
+
+  private fireSpread(from: THREE.Vector3, toPos: THREE.Vector3, dmg: number, speed: number, pellets: number, color: THREE.Color): void {
+    const dx = toPos.x - from.x;
+    const dz = toPos.z - from.z;
+    const base = Math.atan2(dz, dx);
+    for (let i = 0; i < pellets; i++) {
+      const ang = base + (i - (pellets - 1) / 2) * 0.16;
+      const vel = new THREE.Vector3(Math.cos(ang) * speed, 0, Math.sin(ang) * speed);
+      this.pushProj({ pos: from.clone(), vel, kind: 'single', target: null, damage: dmg, splash: 0, gravity: 0, ttl: 1.5, color });
+    }
+  }
+
+  private fireMortar(from: THREE.Vector3, targetPos: THREE.Vector3, dmg: number, splash: number, color: THREE.Color): void {
+    const g = 1.8;
+    const vy0 = 0.5;
+    const T = (2 * vy0) / g; // time to return to launch height
+    const vel = new THREE.Vector3((targetPos.x - from.x) / T, vy0, (targetPos.z - from.z) / T);
+    this.pushProj({ pos: from.clone(), vel, kind: 'mortar', target: null, damage: dmg, splash, gravity: g, ttl: 3, color });
+  }
+
+  private updateProjectiles(dt: number): void {
+    if (this.projectiles.length === 0) {
+      this.projGeo.setDrawRange(0, 0);
+      return;
+    }
+    const LAND_Y = 0.02;
+    const hitR = this.enemyScale * 1.3 + 0.012;
+    const alive: Projectile[] = [];
+    for (const p of this.projectiles) {
+      p.ttl -= dt;
+      if (p.kind === 'mortar') {
+        p.vel.y -= p.gravity * dt;
+      } else if (p.kind === 'homing' && p.target && p.target.alive) {
+        const d = this.tmp.subVectors(p.target.object.position, p.pos);
+        const dl = d.length() || 1;
+        const speed = p.vel.length();
+        d.multiplyScalar(speed / dl);
+        const k = Math.min(1, 6 * dt); // steer rate
+        p.vel.x += (d.x - p.vel.x) * k;
+        p.vel.y += (d.y - p.vel.y) * k;
+        p.vel.z += (d.z - p.vel.z) * k;
+      }
+      p.pos.addScaledVector(p.vel, dt);
+
+      let done = false;
+      if (p.kind === 'mortar') {
+        if (p.vel.y < 0 && p.pos.y <= LAND_Y) {
+          for (const e of this.enemies) {
+            if (!e.alive) continue;
+            const ep = e.object.position;
+            if (Math.hypot(ep.x - p.pos.x, ep.z - p.pos.z) <= p.splash) e.damage(p.damage);
+          }
+          this.spawnBolt(new THREE.Vector3(p.pos.x, LAND_Y, p.pos.z), new THREE.Vector3(p.pos.x, LAND_Y + 0.05, p.pos.z));
+          done = true;
+        }
+      } else {
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const ep = e.object.position;
+          if (Math.hypot(ep.x - p.pos.x, ep.y - p.pos.y, ep.z - p.pos.z) <= hitR) {
+            e.damage(p.damage);
+            done = true;
+            break;
+          }
+        }
+      }
+      if (!done && p.ttl > 0) alive.push(p);
+    }
+    this.projectiles = alive;
+
+    const n = Math.min(alive.length, MAX_PROJ);
+    for (let i = 0; i < n; i++) {
+      const p = alive[i]!;
+      this.projPos[i * 3] = p.pos.x;
+      this.projPos[i * 3 + 1] = p.pos.y;
+      this.projPos[i * 3 + 2] = p.pos.z;
+      this.projCol[i * 3] = p.color.r;
+      this.projCol[i * 3 + 1] = p.color.g;
+      this.projCol[i * 3 + 2] = p.color.b;
+    }
+    this.projGeo.setDrawRange(0, n);
+    (this.projGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (this.projGeo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
   }
 
   /** Remove killed (0 HP) and leaked (reached base) enemies, firing callbacks. */
@@ -458,6 +614,7 @@ export class BoardView {
       const elapsed = now - this.clockStart;
       for (const u of this.units) u.update(dt, elapsed);
       this.stepCombat(dt);
+      this.updateProjectiles(dt);
       this.cullEnemies();
       this.updateEffects(dt);
       if (this.onTick) this.onTick(dt);

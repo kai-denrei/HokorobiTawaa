@@ -7,7 +7,7 @@ import { SHAPES } from './shapes';
 import type { UnitDef } from './roster';
 
 let dotTex: THREE.Texture | null = null;
-function dotTexture(): THREE.Texture {
+export function dotTexture(): THREE.Texture {
   if (dotTex) return dotTex;
   const s = 64;
   const c = document.createElement('canvas');
