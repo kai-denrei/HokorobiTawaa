@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#000000"/>
+  <g fill="none" stroke="#35ff7a" stroke-width="10" stroke-linejoin="round"
+     filter="drop-shadow(0 0 8px #35ff7a)">
+    <!-- organic wireframe cells -->
+    <polygon points="256,96 336,150 320,246 208,252 176,156" opacity="0.9"/>
+    <polygon points="336,150 424,190 420,286 320,246" opacity="0.55"/>
+    <polygon points="176,156 208,252 120,300 92,206" opacity="0.55"/>
+    <polygon points="208,252 320,246 300,352 196,356" opacity="0.7"/>
+    <polygon points="320,246 420,286 400,372 300,352" opacity="0.4"/>
+    <polygon points="196,356 300,352 264,432 168,420" opacity="0.5"/>
+    <!-- mountain pyramid -->
+    <path d="M120,300 L96,392 L168,420 L120,300 Z" opacity="0.5"/>
+  </g>
+</svg>
