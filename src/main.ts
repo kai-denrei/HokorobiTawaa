@@ -3,6 +3,7 @@ import { BoardView } from './render/scene';
 import { createOverlay, type PaletteItem } from './ui/overlay';
 import { generateBoard, type Board } from './board';
 import { TOWERS, ENEMIES } from './units/roster';
+import { Game } from './game/game';
 
 const toItems = (defs: typeof TOWERS): PaletteItem[] =>
   defs.map((d) => ({ key: d.key, label: d.label, role: d.role }));
@@ -22,13 +23,22 @@ const overlay = createOverlay(app, {
   onToggleMountains: (style) => view.setMountainStyle(style),
 });
 
+const game = new Game(view, {
+  onHud: (d) => overlay.setHud(d),
+  onResult: (status) => overlay.showResult(status === 'won'),
+});
+view.onTick = (dt) => game.tick(dt);
+view.onLeak = () => game.leak();
+
 function regenerate(): void {
   overlay.closePalette();
+  overlay.hideResult();
   board = generateBoard(seed, { targetCells: 130 });
   view.setBoard(board);
   view.highlightCell(null);
   overlay.setSeedInfo(`seed ${seed} · ${board.cells.size} cells · path ${board.path.length}`);
-  overlay.setCellInfo('Tap buildable to place a tower · tap the path to spawn an enemy.');
+  overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
+  game.reset();
 }
 
 regenerate();
@@ -73,6 +83,7 @@ canvas.addEventListener('pointerup', (e) => {
 // --- dev/test hook: drive spawns from the console or a smoke test ---------
 (window as unknown as { __hk?: unknown }).__hk = {
   view,
+  game,
   get board() {
     return board;
   },

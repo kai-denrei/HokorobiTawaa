@@ -9,11 +9,22 @@ import { BUILD } from '../version';
 
 export type PaletteItem = { key: string; label: string; role: string };
 
+export type HudData = {
+  lives: number;
+  wave: number;
+  totalWaves: number;
+  message: string;
+  status: string;
+};
+
 export type Overlay = {
   setCellInfo: (text: string) => void;
   setSeedInfo: (text: string) => void;
   openPalette: (title: string, items: PaletteItem[], onPick: (key: string) => void) => void;
   closePalette: () => void;
+  setHud: (data: HudData) => void;
+  showResult: (won: boolean) => void;
+  hideResult: () => void;
 };
 
 export type OverlayHandlers = {
@@ -129,7 +140,20 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     sheet.classList.add('is-open');
   };
 
-  root.append(top, scrim, bottom, sheet);
+  // --- HUD (lives / wave / timer) -----------------------------------------
+  const hud = el('div', 'hk-hud');
+
+  // --- win / lose result screen -------------------------------------------
+  const result = el('div', 'hk-result');
+  const resultInner = el('div', 'hk-result-inner');
+  const resultTitle = el('div', 'hk-result-title');
+  const resultSub = el('div', 'hk-result-sub');
+  const resultBtn = el('button', 'hk-btn', '↻ Play again');
+  resultBtn.addEventListener('click', () => handlers.onRegenerate());
+  resultInner.append(resultTitle, resultSub, resultBtn);
+  result.append(resultInner);
+
+  root.append(top, hud, scrim, bottom, sheet, result);
 
   return {
     setCellInfo: (text) => {
@@ -140,5 +164,19 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     },
     openPalette,
     closePalette,
+    setHud: (data) => {
+      const low = data.lives <= 3 ? ' hk-lives-low' : '';
+      hud.innerHTML =
+        `<span class="hk-lives${low}">♥ ${data.lives}</span>` +
+        `<span class="hk-wave">WAVE ${data.wave}/${data.totalWaves}</span>` +
+        `<span class="hk-msg">${data.message}</span>`;
+    },
+    showResult: (won) => {
+      resultTitle.textContent = won ? 'VICTORY' : 'GAME OVER';
+      resultTitle.classList.toggle('is-won', won);
+      resultSub.textContent = won ? 'All waves cleared.' : 'The base was overrun.';
+      result.classList.add('is-open');
+    },
+    hideResult: () => result.classList.remove('is-open'),
   };
 }

@@ -67,6 +67,10 @@ export class BoardView {
   private effects: { line: THREE.Line; mat: THREE.LineBasicMaterial; ttl: number; max: number }[] = [];
   private towerScale = 0.045;
   private enemyScale = 0.03;
+  /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
+  onTick: ((dt: number) => void) | null = null;
+  onLeak: (() => void) | null = null;
+  onKill: (() => void) | null = null;
   private clockStart = 0;
   private lastT = 0;
   private raycaster = new THREE.Raycaster();
@@ -253,9 +257,7 @@ export class BoardView {
       return new THREE.Vector3(w[0], 0, w[2]);
     });
     if (pts.length < 2) return null;
-    // stagger successive spawns along the path so they march as a column
-    const stagger = (this.enemies.length % 24) * 0.025;
-    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.13, stagger);
+    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.13);
     this.unitsGroup.add(e.object);
     this.units.push(e);
     this.enemies.push(e);
@@ -314,16 +316,21 @@ export class BoardView {
         this.spawnBolt(tp, best.object.position);
       }
     }
+  }
 
-    if (this.enemies.some((e) => !e.alive)) {
-      const dead = new Set(this.enemies.filter((e) => !e.alive));
-      for (const e of dead) {
-        this.unitsGroup.remove(e.object);
-        e.dispose();
-      }
-      this.enemies = this.enemies.filter((e) => e.alive);
-      this.units = this.units.filter((u) => !dead.has(u as Enemy));
+  /** Remove killed (0 HP) and leaked (reached base) enemies, firing callbacks. */
+  private cullEnemies(): void {
+    if (!this.enemies.some((e) => !e.alive || e.reachedEnd)) return;
+    const remove = this.enemies.filter((e) => !e.alive || e.reachedEnd);
+    const rem = new Set<Enemy>(remove);
+    for (const e of remove) {
+      this.unitsGroup.remove(e.object);
+      e.dispose();
+      if (e.reachedEnd) this.onLeak?.();
+      else this.onKill?.();
     }
+    this.enemies = this.enemies.filter((e) => !rem.has(e));
+    this.units = this.units.filter((u) => !rem.has(u as Enemy));
   }
 
   /** A brief additive bolt from tower to target (fades over its lifetime). */
@@ -451,7 +458,9 @@ export class BoardView {
       const elapsed = now - this.clockStart;
       for (const u of this.units) u.update(dt, elapsed);
       this.stepCombat(dt);
+      this.cullEnemies();
       this.updateEffects(dt);
+      if (this.onTick) this.onTick(dt);
       this.composer.render();
       requestAnimationFrame(loop);
     };

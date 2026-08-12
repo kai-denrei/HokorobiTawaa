@@ -2,6 +2,18 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Core loop: lives, waves, timers, win/lose
+
+- Enemies now walk the path ONCE (no looping); reaching the base sets reachedEnd.
+  The scene culls leaked + killed enemies each frame and fires onLeak/onKill/onTick.
+- New `src/game/game.ts`: 15-life pool, 6 escalating waves (two spike waves +
+  a boss wave) spawned on per-group timers, an 8s pre-wave countdown and 6s
+  between-wave countdown. Win = all waves cleared; lose = lives hit 0.
+- HUD (top-centre): ♥ lives · WAVE x/N · countdown/status (lives turn red ≤3).
+- Centred VICTORY / GAME OVER screen with "Play again" (regenerate).
+- Verified headless: countdown → wave 1 spawns → towers fire; 15 leaks →
+  GAME OVER screen. Board tests still green.
+
 ## 2026-08-12 — First combat (towers fire, enemies take damage)
 
 - Enemies now have distinct colours: Butterfly cyan, Breathing Cloud violet,

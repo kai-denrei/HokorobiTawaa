@@ -195,6 +195,48 @@ html, body {
   border-top: 1px solid rgba(31,122,63,0.3);
 }
 
+/* ---- HUD (lives / wave / timer) ---- */
+.hk-hud {
+  position: fixed;
+  top: calc(max(env(safe-area-inset-top), 10px) + 40px);
+  left: 0; right: 0;
+  z-index: 9;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 8px rgba(53,255,122,0.5);
+}
+.hk-lives { color: #5affd0; }
+.hk-lives-low { color: #ff6a6a; text-shadow: 0 0 10px rgba(255,80,80,0.7); }
+.hk-wave { color: var(--hk-green); opacity: 0.9; }
+.hk-msg { color: var(--hk-green); opacity: 0.6; }
+
+/* ---- win / lose result screen ---- */
+.hk-result {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(3px);
+}
+.hk-result.is-open { display: flex; }
+.hk-result-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.hk-result-title {
+  font-size: 40px;
+  letter-spacing: 0.12em;
+  color: #ff6a6a;
+  text-shadow: 0 0 20px rgba(255,80,80,0.6);
+}
+.hk-result-title.is-won { color: var(--hk-green); text-shadow: 0 0 24px rgba(53,255,122,0.6); }
+.hk-result-sub { font-size: 13px; opacity: 0.7; margin-bottom: 6px; }
+
 /* ---- spawn palette (bottom sheet) ---- */
 .hk-sheet {
   position: fixed;

@@ -147,6 +147,8 @@ export class Enemy extends Unit {
   hp: number;
   readonly maxHp: number;
   alive = true;
+  /** Set once the enemy walks off the end of the path (reached the base). */
+  reachedEnd = false;
 
   constructor(
     def: UnitDef,
@@ -183,7 +185,15 @@ export class Enemy extends Unit {
   }
 
   override update(dt: number, elapsed: number): void {
-    this.dist = (this.dist + this.speed * dt) % this.total;
+    if (this.reachedEnd) {
+      this.pose(elapsed);
+      return;
+    }
+    this.dist += this.speed * dt;
+    if (this.dist >= this.total) {
+      this.dist = this.total;
+      this.reachedEnd = true; // reached the base — the game will cost a life
+    }
     // find segment by cumulative length
     let seg = 0;
     while (seg < this.cum.length - 2 && this.cum[seg + 1]! < this.dist) seg++;
