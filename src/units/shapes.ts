@@ -1,0 +1,358 @@
+// shapes.ts — dotted-halftone point-cloud generators, ported verbatim from
+// Braille Lab "Fun Shapes", built on the Thinking Orbs engine
+// (MIT © Jakub Antalik; shape geometry original to Braille Lab). Each generator
+// returns unit-normalised 3D points; we render them as THREE.Points instead of
+// Braille's 2D canvas painter. Only the tower/enemy roster is ported here.
+//
+// A point is [x, y, z] (y up). fitUnit may append a 4th "highlight" flag which
+// we drop when flattening to GPU buffers.
+
+type P = number[];
+
+function normV(v: P): P {
+  const l = Math.sqrt(v[0]! * v[0]! + v[1]! * v[1]! + v[2]! * v[2]!) || 1e-6;
+  return [v[0]! / l, v[1]! / l, v[2]! / l];
+}
+function crossV(a: P, b: P): P {
+  return [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
+}
+function fibDir(i: number, n: number): P {
+  const g = Math.PI * (3 - Math.sqrt(5));
+  const y = 1 - (2 * (i + 0.5)) / n;
+  const r = Math.sqrt(1 - y * y);
+  const a = i * g;
+  return [r * Math.cos(a), y, r * Math.sin(a)];
+}
+function fitUnit(pts: P[]): P[] {
+  let m = 0;
+  for (const p of pts) m = Math.max(m, Math.hypot(p[0]!, p[1]!, p[2]!));
+  if (m < 1e-9) m = 1;
+  return pts.map((p) => [p[0]! / m, p[1]! / m, p[2]! / m]);
+}
+function radialWarp(rFn: (d: P) => number): (dir: P) => P {
+  return (dir) => {
+    const d = normV(dir);
+    const r = rFn(d);
+    return [d[0]! * r, d[1]! * r, d[2]! * r];
+  };
+}
+const lattice = (warp: (dir: P) => P, n: number): P[] =>
+  Array.from({ length: n }, (_, i) => warp(fibDir(i, n)));
+
+// ---- tower shapes ----------------------------------------------------------
+function treePts(): P[] {
+  const pts: P[] = [];
+  const cones: P[] = [[0.95, 0.5, 0.55], [0.55, 0.75, 0.6], [0.1, 1.0, 0.7]];
+  for (const [topY, baseR, hgt] of cones) {
+    const rings = 7;
+    for (let ir = 0; ir <= rings; ir++) {
+      const h = ir / rings;
+      const r = baseR! * h;
+      const y = topY! - h * hgt!;
+      const n = Math.max(1, Math.round(4 + 16 * h));
+      for (let a = 0; a < n; a++) {
+        const ang = (a / n) * 2 * Math.PI;
+        pts.push([r * Math.cos(ang), y, r * Math.sin(ang)]);
+      }
+    }
+  }
+  for (let iy = 0; iy < 8; iy++) {
+    const y = -0.6 - (iy / 8) * 0.4;
+    for (let a = 0; a < 6; a++) {
+      const ang = (a / 6) * 2 * Math.PI;
+      pts.push([0.13 * Math.cos(ang), y, 0.13 * Math.sin(ang)]);
+    }
+  }
+  return fitUnit(pts);
+}
+function gearPts(): P[] {
+  const pts: P[] = [];
+  const teeth = 10;
+  const Ro = 1;
+  const Ri = 0.74;
+  const hub = 0.26;
+  const Nang = teeth * 10;
+  for (let i = 0; i < Nang; i++) {
+    const a = (i / Nang) * 2 * Math.PI;
+    const top = Math.floor((a / (2 * Math.PI)) * teeth * 2) % 2 === 0 ? Ro : Ri;
+    for (let rr = 0.5; rr <= top + 1e-9; rr += 0.085) pts.push([rr * Math.cos(a), rr * Math.sin(a), 0]);
+  }
+  for (let i = 0; i < 44; i++) {
+    const a = (i / 44) * 2 * Math.PI;
+    pts.push([hub * Math.cos(a), hub * Math.sin(a), 0]);
+  }
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * 2 * Math.PI;
+    for (let rr = hub; rr < 0.55; rr += 0.075) pts.push([rr * Math.cos(a), rr * Math.sin(a), 0]);
+  }
+  return fitUnit(pts);
+}
+function spiralPts(): P[] {
+  const N = 470;
+  const pts: P[] = [];
+  for (let i = 0; i < N; i++) {
+    const s = i / N;
+    const th = s * 7 * 2 * Math.PI;
+    const rad = 0.1 + 0.95 * s;
+    const y = (s - 0.5) * 1.5;
+    pts.push([rad * Math.cos(th), y, rad * Math.sin(th)]);
+  }
+  return fitUnit(pts);
+}
+function dblSpiralPts(): P[] {
+  const pts: P[] = [];
+  const N = 120;
+  const turns = 3.2;
+  const rad = 0.5;
+  const H = 1.9;
+  for (let i = 0; i < N; i++) {
+    const s = i / (N - 1);
+    const th = s * turns * 2 * Math.PI;
+    const y = (s - 0.5) * H;
+    for (const ph of [0, Math.PI]) {
+      const c = [rad * Math.cos(th + ph), y, rad * Math.sin(th + ph)];
+      pts.push(c, [c[0]! * 1.07, y, c[2]! * 1.07]);
+    }
+  }
+  return fitUnit(pts);
+}
+function teardropPts(): P[] {
+  const pts: P[] = [];
+  const Nv = 46;
+  const Nu = 26;
+  for (let iv = 0; iv < Nv; iv++) {
+    const t = iv / (Nv - 1);
+    const v = t * Math.PI;
+    const y = Math.cos(v);
+    const r = 0.95 * Math.sin(v) * Math.pow(t, 0.6);
+    for (let iu = 0; iu < Nu; iu++) {
+      const u = (iu / Nu) * 2 * Math.PI;
+      pts.push([r * Math.cos(u), y, r * Math.sin(u)]);
+    }
+  }
+  return fitUnit(pts);
+}
+function dnaPts(): P[] {
+  const pts: P[] = [];
+  const N = 180;
+  const turns = 2.0;
+  const R = 0.42;
+  const H = 2.25;
+  const tubeR = 0.05;
+  const M = 5;
+  const dth = (turns * 2 * Math.PI) / (N - 1);
+  const dy = H / (N - 1);
+  const backbone = (phase: number): void => {
+    for (let i = 0; i < N; i++) {
+      const s = i / (N - 1);
+      const th = s * turns * 2 * Math.PI + phase;
+      const y = (s - 0.5) * H;
+      const C = [R * Math.cos(th), y, R * Math.sin(th)];
+      const T = normV([-R * Math.sin(th) * dth, dy, R * Math.cos(th) * dth]);
+      let n1 = normV(crossV(T, [0, 1, 0]));
+      if (!(n1[0] || n1[1] || n1[2])) n1 = [1, 0, 0];
+      const n2 = crossV(T, n1);
+      for (let m = 0; m < M; m++) {
+        const a = (m / M) * 2 * Math.PI;
+        const cs = Math.cos(a);
+        const sn = Math.sin(a);
+        pts.push([
+          C[0]! + tubeR * (cs * n1[0]! + sn * n2[0]!),
+          C[1]! + tubeR * (cs * n1[1]! + sn * n2[1]!),
+          C[2]! + tubeR * (cs * n1[2]! + sn * n2[2]!),
+        ]);
+      }
+    }
+  };
+  backbone(0);
+  backbone(Math.PI);
+  const RN = 15;
+  for (let j = 0; j < RN; j++) {
+    const s = (j + 0.5) / RN;
+    const th = s * turns * 2 * Math.PI;
+    const y = (s - 0.5) * H;
+    const a = [R * Math.cos(th), y, R * Math.sin(th)];
+    const b = [R * Math.cos(th + Math.PI), y, R * Math.sin(th + Math.PI)];
+    for (let r = 0; r <= 9; r++) {
+      const f = r / 9;
+      const x = a[0]! + (b[0]! - a[0]!) * f;
+      const yy = a[1]! + (b[1]! - a[1]!) * f;
+      const z = a[2]! + (b[2]! - a[2]!) * f;
+      pts.push([x, yy, z], [x, yy + 0.028, z], [x, yy - 0.028, z]);
+    }
+  }
+  return fitUnit(pts);
+}
+function songsPts(): P[] {
+  const pts: P[] = [];
+  const dome = (cx: number): void => {
+    const Rr = 0.5;
+    const baseY = -0.15;
+    for (let i = 0; i < 260; i++) {
+      const d = fibDir(i, 260);
+      if (d[1]! < 0) continue;
+      pts.push([cx + d[0]! * Rr, baseY + d[1]! * Rr, d[2]! * Rr]);
+    }
+    for (let iy = 0; iy < 7; iy++) {
+      const y = baseY - (iy / 7) * 0.3;
+      for (let a = 0; a < 34; a++) {
+        const ang = (a / 34) * 2 * Math.PI;
+        pts.push([cx + Rr * Math.cos(ang), y, Rr * Math.sin(ang)]);
+      }
+    }
+  };
+  dome(-0.58);
+  dome(0.58);
+  const slab = (x0: number, x1: number, z0: number, z1: number, top: number, bot: number, nx: number, nz: number): void => {
+    for (let ix = 0; ix <= nx; ix++)
+      for (let iz = 0; iz <= nz; iz++)
+        pts.push([x0 + ((x1 - x0) * ix) / nx, top, z0 + ((z1 - z0) * iz) / nz]);
+    const wall = (x: number, z: number): void => {
+      for (let iy = 1; iy <= 5; iy++) pts.push([x, top - ((top - bot) * iy) / 5, z]);
+    };
+    for (let ix = 0; ix <= nx; ix++) {
+      wall(x0 + ((x1 - x0) * ix) / nx, z0);
+      wall(x0 + ((x1 - x0) * ix) / nx, z1);
+    }
+    for (let iz = 0; iz <= nz; iz++) {
+      wall(x0, z0 + ((z1 - z0) * iz) / nz);
+      wall(x1, z0 + ((z1 - z0) * iz) / nz);
+    }
+  };
+  slab(-1.3, 1.3, -0.5, 0.5, -0.45, -0.62, 26, 10);
+  slab(-1.6, 1.6, -0.7, 0.7, -0.62, -0.82, 28, 11);
+  return fitUnit(pts);
+}
+
+// ---- enemy shapes ----------------------------------------------------------
+function bflyR(d: P): number {
+  const th = Math.atan2(d[1]!, d[0]!);
+  const wings = Math.pow(Math.abs(Math.sin(2 * th)), 0.7);
+  const upper = 0.6 + 0.45 * Math.max(0, Math.sin(th));
+  const flat = Math.exp(-Math.pow(2.3 * d[2]!, 2));
+  const body = 0.32 * Math.exp(-Math.pow(3 * Math.cos(th), 2));
+  return (0.16 + wings * upper) * flat + body + 0.1;
+}
+function butterflyPts(): P[] {
+  return fitUnit(lattice(radialWarp(bflyR), 780));
+}
+function torusKnotPts(): P[] {
+  const p = 2;
+  const q = 3;
+  const N = 300;
+  const M = 6;
+  const tubeR = 0.5;
+  const pts: P[] = [];
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * 2 * Math.PI;
+    const cr = 2 + Math.cos(q * t);
+    const C = [cr * Math.cos(p * t), cr * Math.sin(p * t), Math.sin(q * t)];
+    const t2 = t + 0.01;
+    const cr2 = 2 + Math.cos(q * t2);
+    const C2 = [cr2 * Math.cos(p * t2), cr2 * Math.sin(p * t2), Math.sin(q * t2)];
+    const T = normV([C2[0]! - C[0]!, C2[1]! - C[1]!, C2[2]! - C[2]!]);
+    let n1 = normV(crossV(T, [0, 0, 1]));
+    if (!isFinite(n1[0]!)) n1 = [1, 0, 0];
+    const n2 = crossV(T, n1);
+    for (let m = 0; m < M; m++) {
+      const a = (m / M) * 2 * Math.PI;
+      const cs = Math.cos(a);
+      const sn = Math.sin(a);
+      pts.push([
+        C[0]! + tubeR * (cs * n1[0]! + sn * n2[0]!),
+        C[1]! + tubeR * (cs * n1[1]! + sn * n2[1]!),
+        C[2]! + tubeR * (cs * n1[2]! + sn * n2[2]!),
+      ]);
+    }
+  }
+  return fitUnit(pts);
+}
+function shellPts(): P[] {
+  const pts: P[] = [];
+  const k = 0.2;
+  const turns = 3.6;
+  const Nt = 168;
+  const Mf = 11;
+  for (let it = 0; it < Nt; it++) {
+    const th = (it / Nt) * turns * 2 * Math.PI;
+    const R = 0.05 * Math.exp(k * th);
+    const ct = Math.cos(th);
+    const st = Math.sin(th);
+    const tr = R * 0.62;
+    for (let ip = 0; ip < Mf; ip++) {
+      const f = (ip / Mf) * 2 * Math.PI;
+      pts.push([R * ct + tr * Math.cos(f) * ct, R * st + tr * Math.cos(f) * st, tr * Math.sin(f)]);
+    }
+  }
+  return fitUnit(pts);
+}
+function cloudPts(): P[] {
+  const pts: P[] = [];
+  const blobs: P[] = [
+    [-0.6, -0.05, 0.45],
+    [0.0, 0.05, 0.6],
+    [0.6, -0.05, 0.5],
+    [-0.28, 0.22, 0.4],
+    [0.32, 0.22, 0.42],
+  ];
+  for (const [cx, cy, r] of blobs)
+    for (let i = 0; i < 120; i++) {
+      const d = fibDir(i, 120);
+      pts.push([cx! + d[0]! * r!, Math.max(-0.35, cy! + d[1]! * r! * 0.8), d[2]! * r! * 0.7]);
+    }
+  return fitUnit(pts);
+}
+function ghostPts(): P[] {
+  const pts: P[] = [];
+  const Nu = 56;
+  const rBase = 0.72;
+  for (let iu = 0; iu < Nu; iu++) {
+    const u = (iu / Nu) * 2 * Math.PI;
+    const ct = Math.cos(u);
+    const st = Math.sin(u);
+    const bottomY = -0.85 + 0.15 * Math.abs(Math.sin(3 * u));
+    for (let iv = 0; iv <= 10; iv++) {
+      const vv = (iv / 10) * (Math.PI / 2);
+      const y = rBase * Math.cos(vv);
+      const rr = rBase * Math.sin(vv);
+      pts.push([rr * ct, y, rr * st]);
+    }
+    for (let iv = 1; iv <= 10; iv++) {
+      const y = (iv / 10) * bottomY;
+      pts.push([rBase * ct, y, rBase * st]);
+    }
+  }
+  return fitUnit(pts);
+}
+
+export type ShapeDef = {
+  key: string;
+  label: string;
+  positions: Float32Array;
+  count: number;
+};
+
+function toShape(key: string, label: string, pts: P[]): ShapeDef {
+  const arr = new Float32Array(pts.length * 3);
+  for (let i = 0; i < pts.length; i++) {
+    arr[i * 3] = pts[i]![0]!;
+    arr[i * 3 + 1] = pts[i]![1]!;
+    arr[i * 3 + 2] = pts[i]![2]!;
+  }
+  return { key, label, positions: arr, count: pts.length };
+}
+
+export const SHAPES: Record<string, ShapeDef> = {
+  tree: toShape('tree', 'Pine Tree', treePts()),
+  gear: toShape('gear', 'Gear', gearPts()),
+  spiral: toShape('spiral', 'Spiral', spiralPts()),
+  dspiral: toShape('dspiral', 'Double Spiral', dblSpiralPts()),
+  teardrop: toShape('teardrop', 'Teardrop', teardropPts()),
+  songs: toShape('songs', 'SONGS Domes', songsPts()),
+  dna: toShape('dna', 'DNA Helix', dnaPts()),
+  butterfly: toShape('butterfly', 'Butterfly', butterflyPts()),
+  knot: toShape('knot', 'Torus Knot', torusKnotPts()),
+  shell: toShape('shell', 'Shell', shellPts()),
+  cloud: toShape('cloud', 'Cloud', cloudPts()),
+  ghost: toShape('ghost', 'Ghost', ghostPts()),
+};

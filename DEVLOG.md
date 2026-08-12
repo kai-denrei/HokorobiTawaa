@@ -2,6 +2,22 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Units (spawn test, no gameplay)
+
+- Ported Braille "Fun Shapes" point-cloud generators (Thinking Orbs engine,
+  MIT © Jakub Antalik) into `src/units/shapes.ts` — the exact unit shapes,
+  rendered as THREE.Points (dotted-halftone) instead of Braille's 2D canvas.
+- Roster (`src/units/roster.ts`): 7 towers (Pine Tree, Gear, Spiral, Double
+  Spiral, Teardrop, SONGS Domes, DNA Helix — green) + 5 enemies (Butterfly,
+  Breathing Cloud, Torus Knot, Nautilus Shell, Wave Ghost — amber).
+- `Unit`/`Enemy` (`src/units/unit.ts`): round additive dot sprites; towers
+  static with subtle spin (Gear/Spiral/DNA); enemies idle-animate (spin/
+  breathe/flutter/bob) and walk the fixed spawn→base path on a loop.
+- Placement: tap a buildable cell → tower list; tap the path/spawn → enemy
+  list (bottom-sheet palettes). Solid mountains are now the default.
+- Verified headless: 12 units spawn, enemies walk the path, tap→palette→place
+  works, zero console errors. Still NO gameplay (no combat/economy).
+
 ## 2026-08-12 — Board milestone
 
 - Scaffolded Vite + TypeScript + Three.js (vanilla-TS UI, no React).

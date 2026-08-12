@@ -11,6 +11,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { Board, Cell, Vec2 } from '../board';
 import { THEME, BLOOM, MOUNTAIN_LEAN } from './theme';
+import { Unit, Enemy } from '../units/unit';
+import { UNIT_BY_KEY } from '../units/roster';
 
 export type MountainStyle = 'wire' | 'solid';
 
@@ -57,7 +59,12 @@ export class BoardView {
   private boardGroup = new THREE.Group();
   private highlight: THREE.LineLoop | null = null;
   private board: Board | null = null;
-  private mountainStyle: MountainStyle = 'wire';
+  private mountainStyle: MountainStyle = 'solid';
+  private unitsGroup = new THREE.Group();
+  private units: Unit[] = [];
+  private unitScale = 0.05;
+  private clockStart = 0;
+  private lastT = 0;
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private disposables: { dispose(): void }[] = [];
@@ -68,6 +75,7 @@ export class BoardView {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.scene.background = new THREE.Color(THEME.background);
     this.scene.add(this.boardGroup);
+    this.scene.add(this.unitsGroup);
 
     // Lighting only affects the solid (Standard-material) mountains; the
     // wireframe board uses LineBasicMaterial and ignores lights entirely.
@@ -96,6 +104,7 @@ export class BoardView {
   setBoard(board: Board): void {
     this.board = board;
     this.clearGroup();
+    this.clearUnits();
 
     // Batch cell outlines per terrain into single LineSegments for few draw calls.
     const buildableSegs: number[] = [];
@@ -212,6 +221,48 @@ export class BoardView {
     if (this.board) this.setBoard(this.board);
   }
 
+  /** Place a tower (static dotted unit) on a cell. Returns its role label or null. */
+  spawnTower(cellId: number, key: string): string | null {
+    if (!this.board) return null;
+    const cell = this.board.cells.get(cellId);
+    const def = UNIT_BY_KEY[key];
+    if (!cell || !def || def.family !== 'tower') return null;
+    const u = new Unit(def, this.unitScale, this.units.length);
+    const w = toWorld(cell.center);
+    u.placeAt(w[0], w[2]);
+    this.unitsGroup.add(u.object);
+    this.units.push(u);
+    return def.label;
+  }
+
+  /** Spawn an enemy that walks the board path from spawn to base, looping. */
+  spawnEnemy(key: string): string | null {
+    if (!this.board) return null;
+    const def = UNIT_BY_KEY[key];
+    if (!def || def.family !== 'enemy') return null;
+    const pts = this.board.path.map((id) => {
+      const w = toWorld(this.board!.cells.get(id)!.center);
+      return new THREE.Vector3(w[0], 0, w[2]);
+    });
+    if (pts.length < 2) return null;
+    const e = new Enemy(def, this.unitScale, this.units.length, pts, 0.11);
+    this.unitsGroup.add(e.object);
+    this.units.push(e);
+    return def.label;
+  }
+
+  clearUnits(): void {
+    for (const u of this.units) {
+      this.unitsGroup.remove(u.object);
+      u.dispose();
+    }
+    this.units = [];
+  }
+
+  get unitCount(): number {
+    return this.units.length;
+  }
+
   private addMarker(cell: Cell, color: number): void {
     const r = cellRadius(cell) * 0.7;
     const geo = new THREE.RingGeometry(r * 0.6, r, 6);
@@ -244,6 +295,20 @@ export class BoardView {
     return null;
   }
 
+  /** Project a cell centre to CSS-pixel screen coords (for tests / tooltips). */
+  cellScreenPos(cellId: number): { x: number; y: number } | null {
+    if (!this.board) return null;
+    const c = this.board.cells.get(cellId);
+    if (!c) return null;
+    const w = toWorld(c.center);
+    const v = new THREE.Vector3(w[0], 0, w[2]).project(this.camera);
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: rect.left + (v.x * 0.5 + 0.5) * rect.width,
+      y: rect.top + (-v.y * 0.5 + 0.5) * rect.height,
+    };
+  }
+
   highlightCell(cell: Cell | null): void {
     if (this.highlight) {
       this.boardGroup.remove(this.highlight);
@@ -265,8 +330,15 @@ export class BoardView {
   start(): void {
     if (this.running) return;
     this.running = true;
+    this.clockStart = performance.now() / 1000;
+    this.lastT = this.clockStart;
     const loop = (): void => {
       if (!this.running) return;
+      const now = performance.now() / 1000;
+      const dt = Math.min(0.05, now - this.lastT);
+      this.lastT = now;
+      const elapsed = now - this.clockStart;
+      for (const u of this.units) u.update(dt, elapsed);
       this.composer.render();
       requestAnimationFrame(loop);
     };
@@ -296,6 +368,7 @@ export class BoardView {
   dispose(): void {
     this.stop();
     window.removeEventListener('resize', this.resize);
+    this.clearUnits();
     this.clearGroup();
     this.renderer.dispose();
   }

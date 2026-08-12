@@ -7,9 +7,13 @@ import rulesRaw from '../../RULES.md?raw';
 import { renderMarkdown } from './markdown';
 import { BUILD } from '../version';
 
+export type PaletteItem = { key: string; label: string; role: string };
+
 export type Overlay = {
   setCellInfo: (text: string) => void;
   setSeedInfo: (text: string) => void;
+  openPalette: (title: string, items: PaletteItem[], onPick: (key: string) => void) => void;
+  closePalette: () => void;
 };
 
 export type OverlayHandlers = {
@@ -83,8 +87,8 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const regen = el('button', 'hk-btn', '↻ Regenerate');
   regen.addEventListener('click', () => handlers.onRegenerate());
 
-  let mountainSolid = false;
-  const toggle = el('button', 'hk-btn hk-btn-ghost', '⛰ Wire');
+  let mountainSolid = true;
+  const toggle = el('button', 'hk-btn hk-btn-ghost', '⛰ Solid');
   toggle.title = 'Toggle mountains: wireframe / solid';
   toggle.addEventListener('click', () => {
     mountainSolid = !mountainSolid;
@@ -98,7 +102,34 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   controls.append(toggle, regen);
   bottom.append(left, controls);
 
-  root.append(top, scrim, bottom);
+  // --- spawn palette (bottom sheet) ---------------------------------------
+  const sheet = el('div', 'hk-sheet');
+  const sheetHead = el('div', 'hk-sheet-head');
+  const sheetTitle = el('div', 'hk-sheet-title', '');
+  const sheetClose = el('button', 'hk-close', '×');
+  sheetHead.append(sheetTitle, sheetClose);
+  const sheetGrid = el('div', 'hk-sheet-grid');
+  sheet.append(sheetHead, sheetGrid);
+
+  const closePalette = (): void => sheet.classList.remove('is-open');
+  sheetClose.addEventListener('click', closePalette);
+
+  const openPalette = (title: string, items: PaletteItem[], onPick: (key: string) => void): void => {
+    sheetTitle.textContent = title;
+    sheetGrid.innerHTML = '';
+    for (const it of items) {
+      const b = el('button', 'hk-unit');
+      b.innerHTML = `<span class="hk-unit-label">${it.label}</span><span class="hk-unit-role">${it.role}</span>`;
+      b.addEventListener('click', () => {
+        onPick(it.key);
+        closePalette();
+      });
+      sheetGrid.append(b);
+    }
+    sheet.classList.add('is-open');
+  };
+
+  root.append(top, scrim, bottom, sheet);
 
   return {
     setCellInfo: (text) => {
@@ -107,5 +138,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     setSeedInfo: (text) => {
       seedInfo.textContent = text;
     },
+    openPalette,
+    closePalette,
   };
 }
