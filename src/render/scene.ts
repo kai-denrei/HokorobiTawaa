@@ -56,7 +56,7 @@ export class BoardView {
   readonly camera: THREE.PerspectiveCamera;
   private composer: EffectComposer;
   private boardGroup = new THREE.Group();
-  private highlight: THREE.LineLoop | null = null;
+  private highlight: THREE.LineSegments | null = null;
   private board: Board | null = null;
   private mountainStyle: MountainStyle = 'solid';
   private unitsGroup = new THREE.Group();
@@ -319,13 +319,29 @@ export class BoardView {
       this.highlight = null;
     }
     if (!cell) return;
-    const pts = cell.polygon.map((p) => {
-      const w = toWorld(p);
-      return new THREE.Vector3(w[0], 0.01, w[2]);
-    });
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+
+    // Raised cells (buildable platforms / blocked walls) are outlined as the
+    // whole block — inset top ring + vertical ribs + base ring — so the
+    // selection is visible on top, not hidden at the ground. Low path cells
+    // just get their ground ring.
+    const raised = cell.terrain === 'buildable' || cell.terrain === 'blocked';
+    const H = raised ? WALL_HEIGHT : 0.012;
+    const poly = cell.polygon;
+    const n = poly.length;
+    const segs: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = raised ? this.insetWorld(cell, poly[i]!) : toWorld(poly[i]!);
+      const b = raised ? this.insetWorld(cell, poly[(i + 1) % n]!) : toWorld(poly[(i + 1) % n]!);
+      segs.push(a[0], H, a[2], b[0], H, b[2]); // top ring
+      if (raised) {
+        segs.push(a[0], 0, a[2], b[0], 0, b[2]); // base ring
+        segs.push(a[0], 0, a[2], a[0], H, a[2]); // vertical rib
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
     const mat = new THREE.LineBasicMaterial({ color: 0xffffff });
-    this.highlight = new THREE.LineLoop(geo, mat);
+    this.highlight = new THREE.LineSegments(geo, mat);
     this.boardGroup.add(this.highlight);
   }
 

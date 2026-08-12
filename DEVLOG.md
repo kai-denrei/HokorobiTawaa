@@ -2,6 +2,16 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Edge-only movement & full-cell highlight
+
+- Adjacency is now EDGE-only: cells that merely touch at a corner (quad diagonal)
+  are no longer neighbours. Units can't cut corners, and every BFS path is a
+  continuous open corridor (consecutive cells share a full edge) — guaranteeing
+  at least one clean route spawn→base. Board invariant tests still pass.
+- Selecting a cell now highlights the WHOLE raised block (inset top ring +
+  vertical ribs + base) in white, visible on top, instead of just the hidden
+  ground ring. Low path cells keep a ground ring.
+
 ## 2026-08-12 — Platforms & hallways
 
 - Reworked the spatial model: buildable cells are now raised green **platforms**

@@ -27,7 +27,10 @@ export function poissonRadiusFor(targetCells: number): number {
  * Extract game-facing cells from a finalized (relaxed) mesh.
  * - One cell per interior primary vertex (≥3 incident quads).
  * - polygon = incident quad centroids (CCW).
- * - Adjacency: cells whose primary vertices share a quad EDGE or DIAGONAL.
+ * - Adjacency: EDGE-only — cells whose primary vertices share a quad edge (i.e.
+ *   whose dual polygons share a full edge). Corner-only (diagonal) neighbours
+ *   are deliberately NOT linked, so units can't cut through corners and every
+ *   BFS path is a continuous open corridor (consecutive cells share an edge).
  * - terrain defaults to 'buildable'; terrain.ts overwrites it.
  */
 export function extractCells(mesh: Mesh): Map<CellId, Cell> {
@@ -39,23 +42,11 @@ export function extractCells(mesh: Mesh): Map<CellId, Cell> {
 
   const neighborSets: Set<CellId>[] = dualCells.map(() => new Set<CellId>());
 
-  // Edge adjacency: any quad edge (a,b) with both endpoints interior.
+  // Edge adjacency ONLY: any quad edge (a,b) with both endpoints interior.
   for (const q of mesh.quads) {
     for (let i = 0; i < 4; i++) {
       const a = q[i as 0 | 1 | 2 | 3];
       const b = q[((i + 1) % 4) as 0 | 1 | 2 | 3];
-      const ca = idByVertex.get(a);
-      const cb = idByVertex.get(b);
-      if (ca === undefined || cb === undefined || ca === cb) continue;
-      neighborSets[ca]!.add(cb);
-      neighborSets[cb]!.add(ca);
-    }
-  }
-  // Diagonal adjacency: corner-sharing cells are distance 1 too.
-  for (const q of mesh.quads) {
-    for (let i = 0; i < 2; i++) {
-      const a = q[i as 0 | 1];
-      const b = q[(i + 2) as 2 | 3];
       const ca = idByVertex.get(a);
       const cb = idByVertex.get(b);
       if (ca === undefined || cb === undefined || ca === cb) continue;

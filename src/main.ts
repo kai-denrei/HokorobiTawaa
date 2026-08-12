@@ -81,6 +81,11 @@ canvas.addEventListener('pointerup', (e) => {
     const cell = [...board.cells.values()].find((c) => c.terrain === 'buildable');
     return cell ? view.cellScreenPos(cell.id) : null;
   },
+  highlightFirstBuildable: () => {
+    const cell = [...board.cells.values()].find((c) => c.terrain === 'buildable');
+    view.highlightCell(cell ?? null);
+    return cell ? cell.id : null;
+  },
   spawnEveryEnemy: () => ENEMIES.map((e) => view.spawnEnemy(e.key)),
   spawnSomeTowers: () => {
     const buildable = [...board.cells.values()].filter((c) => c.terrain === 'buildable');
