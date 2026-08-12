@@ -21,6 +21,15 @@ function cellRadius(cell: Cell): number {
   return cell.polygon.length ? s / cell.polygon.length : 0.02;
 }
 
+/** Deterministic integer hash → [0,1), for per-cell height/apex variance. */
+function hash01(n: number): number {
+  let x = (n | 0) ^ 0x9e3779b9;
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x / 4294967296;
+}
+
 /** point-in-polygon (ray cast), board-space. */
 function pointInPolygon(px: number, py: number, poly: Vec2[]): boolean {
   let inside = false;
@@ -81,10 +90,11 @@ export class BoardView {
     // Batch cell outlines per terrain into single LineSegments for few draw calls.
     const buildableSegs: number[] = [];
     const pathSegs: number[] = [];
+    const mountainSegs: number[] = [];
 
     for (const cell of board.cells.values()) {
       if (cell.terrain === 'blocked') {
-        this.addMountain(cell);
+        this.pushMountain(mountainSegs, cell);
         continue;
       }
       const target = cell.terrain === 'path' || cell.terrain === 'spawn' || cell.terrain === 'base'
@@ -100,6 +110,7 @@ export class BoardView {
 
     this.addLineSegments(buildableSegs, THEME.buildable, THEME.buildableDim);
     this.addLineSegments(pathSegs, THEME.path, 1.0);
+    this.addLineSegments(mountainSegs, THEME.mountain, 0.95);
 
     // Accent markers for spawn(s) and base — small upright rings.
     for (const s of board.spawns) this.addMarker(board.cells.get(s)!, THEME.spawn);
@@ -120,18 +131,33 @@ export class BoardView {
     this.disposables.push(geo, mat);
   }
 
-  private addMountain(cell: Cell): void {
+  /**
+   * A blocked cell becomes a pyramid whose base IS the cell's own (irregular)
+   * polygon, rising to a single apex over the cell centre. Height and apex
+   * offset vary deterministically per cell, so peaks are uneven and natural
+   * rather than uniform cones dropped on top of the grid. Emits base-edge +
+   * rib segments into the shared mountain batch.
+   */
+  private pushMountain(target: number[], cell: Cell): void {
+    const poly = cell.polygon;
+    const n = poly.length;
+    if (n < 3) return;
     const r = cellRadius(cell);
-    const h = r * 2.4;
-    const geo = new THREE.ConeGeometry(r * 1.05, h, 4); // 4-sided = pyramid
-    const wire = new THREE.EdgesGeometry(geo);
-    const mat = new THREE.LineBasicMaterial({ color: THEME.mountain });
-    const lines = new THREE.LineSegments(wire, mat);
-    const w = toWorld(cell.center);
-    lines.position.set(w[0], h / 2, w[2]);
-    lines.rotation.y = Math.PI / 4; // face pyramid edges outward
-    this.boardGroup.add(lines);
-    this.disposables.push(geo, wire, mat);
+    const height = r * (1.7 + hash01(cell.id) * 1.9);
+    // Lean the apex slightly off-centre for an organic, uneven peak.
+    const ox = (hash01(cell.id * 2 + 1) - 0.5) * r * 0.6;
+    const oz = (hash01(cell.id * 2 + 7) - 0.5) * r * 0.6;
+    const apexX = cell.center[0] - 0.5 + ox;
+    const apexZ = cell.center[1] - 0.5 + oz;
+
+    for (let i = 0; i < n; i++) {
+      const a = toWorld(poly[i]!);
+      const b = toWorld(poly[(i + 1) % n]!);
+      // base edge (the cell's own outline, on the ground plane)
+      target.push(a[0], 0, a[2], b[0], 0, b[2]);
+      // rib from this base vertex up to the shared apex
+      target.push(a[0], 0, a[2], apexX, height, apexZ);
+    }
   }
 
   private addMarker(cell: Cell, color: number): void {

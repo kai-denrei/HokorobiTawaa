@@ -16,8 +16,10 @@ Newest first. Surfaced in-app via the version badge → Dev Log tab.
 - 7 vitest invariants pass: cell count, terrain validity, adjacency symmetry,
   single base / ≥1 spawn, path connectivity, reachability, determinism.
 - Rendered the board in Three.js: green-on-black wireframe cells (bright path,
-  dim buildable), blocked cells as extruded 4-sided wireframe pyramids, spawn/
-  base accent rings, additive bloom for the phosphor look, fixed tilted camera.
+  dim buildable), blocked cells extruded into pyramids whose base IS the cell's
+  own irregular polygon (varied height + slight apex lean per cell, so peaks are
+  uneven and grow out of the mesh rather than sitting on top), spawn/base accent
+  rings, additive bloom for the phosphor look, fixed tilted camera.
 - Tap hit-testing resolves a screen tap to the correct irregular cell polygon
   (raycast to ground plane → point-in-polygon). Regenerate button reseeds.
 - PWA: manifest + service worker (installable, offline shell).
