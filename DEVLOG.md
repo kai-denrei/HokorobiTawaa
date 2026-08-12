@@ -14,7 +14,10 @@ Newest first. Surfaced in-app via the version badge → Dev Log tab.
   static with subtle spin (Gear/Spiral/DNA); enemies idle-animate (spin/
   breathe/flutter/bob) and walk the fixed spawn→base path on a loop.
 - Placement: tap a buildable cell → tower list; tap the path/spawn → enemy
-  list (bottom-sheet palettes). Solid mountains are now the default.
+  list (bottom-sheet palettes). Solid terrain is the default.
+- Terrain reworked: blocked cells are now flat-topped raised blocks (walls) at
+  a uniform elevation instead of pyramids, so the path/buildable cells read as
+  low hallways between walls (wire + solid both updated).
 - Verified headless: 12 units spawn, enemies walk the path, tap→palette→place
   works, zero console errors. Still NO gameplay (no combat/economy).
 

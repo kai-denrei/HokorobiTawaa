@@ -10,7 +10,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { Board, Cell, Vec2 } from '../board';
-import { THEME, BLOOM, MOUNTAIN_LEAN } from './theme';
+import { THEME, BLOOM } from './theme';
 import { Unit, Enemy } from '../units/unit';
 import { UNIT_BY_KEY } from '../units/roster';
 
@@ -25,14 +25,9 @@ function cellRadius(cell: Cell): number {
   return cell.polygon.length ? s / cell.polygon.length : 0.02;
 }
 
-/** Deterministic integer hash → [0,1), for per-cell height/apex variance. */
-function hash01(n: number): number {
-  let x = (n | 0) ^ 0x9e3779b9;
-  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-  x = (x ^ (x >>> 16)) >>> 0;
-  return x / 4294967296;
-}
+/** Uniform flat elevation (world units) for blocked "wall" cells, so blocked
+ * terrain reads as walls and the path/buildable cells as low hallways. */
+const WALL_HEIGHT = 0.06;
 
 /** point-in-polygon (ray cast), board-space. */
 function pointInPolygon(px: number, py: number, poly: Vec2[]): boolean {
@@ -153,47 +148,38 @@ export class BoardView {
     this.disposables.push(geo, mat);
   }
 
-  /**
-   * Apex of the mountain over `cell`. Base is always the cell's own (irregular)
-   * polygon; height varies deterministically per cell, but every apex leans the
-   * SAME direction (MOUNTAIN_LEAN, scaled by height) so all peaks tilt uniformly
-   * and read as a single perspective/wind direction.
-   */
-  private mountainApex(cell: Cell): { x: number; y: number; z: number } {
-    const r = cellRadius(cell);
-    const height = r * (1.7 + hash01(cell.id) * 1.9);
-    return {
-      x: cell.center[0] - 0.5 + height * MOUNTAIN_LEAN.x,
-      y: height,
-      z: cell.center[1] - 0.5 + height * MOUNTAIN_LEAN.z,
-    };
-  }
-
-  /** Wireframe pyramid: base edges + ribs up to the apex. */
+  /** Wireframe wall: the cell polygon at ground + a flat top ring at WALL_HEIGHT,
+   * joined by vertical ribs. Flat top (not a peak) reads as a raised block. */
   private pushMountain(target: number[], cell: Cell): void {
     const poly = cell.polygon;
     const n = poly.length;
     if (n < 3) return;
-    const apex = this.mountainApex(cell);
+    const H = WALL_HEIGHT;
     for (let i = 0; i < n; i++) {
       const a = toWorld(poly[i]!);
       const b = toWorld(poly[(i + 1) % n]!);
       target.push(a[0], 0, a[2], b[0], 0, b[2]); // base edge
-      target.push(a[0], 0, a[2], apex.x, apex.y, apex.z); // rib
+      target.push(a[0], H, a[2], b[0], H, b[2]); // top edge (flat)
+      target.push(a[0], 0, a[2], a[0], H, a[2]); // vertical rib
     }
   }
 
-  /** Solid pyramid: one triangle per base edge (edge → apex). DoubleSide
-   * material makes winding irrelevant; the ground-facing base face is omitted. */
+  /** Solid wall: vertical side quads (2 tris/edge) + a flat top cap (fan from the
+   * cell centre). DoubleSide material makes winding irrelevant. */
   private pushMountainSolid(target: number[], cell: Cell): void {
     const poly = cell.polygon;
     const n = poly.length;
     if (n < 3) return;
-    const apex = this.mountainApex(cell);
+    const H = WALL_HEIGHT;
+    const c = toWorld(cell.center);
     for (let i = 0; i < n; i++) {
       const a = toWorld(poly[i]!);
       const b = toWorld(poly[(i + 1) % n]!);
-      target.push(a[0], 0, a[2], b[0], 0, b[2], apex.x, apex.y, apex.z);
+      // side wall (ground a→b up to top a→b)
+      target.push(a[0], 0, a[2], b[0], 0, b[2], b[0], H, b[2]);
+      target.push(a[0], 0, a[2], b[0], H, b[2], a[0], H, a[2]);
+      // flat top cap triangle (centre → edge)
+      target.push(c[0], H, c[2], a[0], H, a[2], b[0], H, b[2]);
     }
   }
 
