@@ -2,6 +2,18 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Attract mode + PLAY
+
+- On load the game now boots into an **attract demo**: one of each tower is
+  auto-placed along the path and random enemies spawn on a timer, so towers fire
+  and the whole capability set is on display. Leaks don't cost lives in the demo.
+- A translucent title screen (name + tagline + big **PLAY** button) sits over
+  the running demo. PLAY clears the demo units and starts the real game on the
+  current board (countdown → waves). Tower placement is disabled during attract.
+- App now has a `mode` ('attract' | 'play'); onTick routes to the demo spawner
+  or the wave game accordingly. Regenerate is mode-aware.
+- Next: economy/currency and thought-through damage scaling.
+
 ## 2026-08-12 — Varied attack patterns (projectiles)
 
 - Towers no longer all hitscan. Each has an `attack` type + a pooled projectile

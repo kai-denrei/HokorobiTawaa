@@ -15,33 +15,106 @@ const view = new BoardView(canvas);
 let seed = (Math.random() * 0x7fffffff) | 0;
 let board: Board;
 
+type Mode = 'attract' | 'play';
+let mode: Mode = 'attract';
+let demoTimer = 0;
+
+const rand = (): number => (Math.random() * 0x7fffffff) | 0;
+
 const overlay = createOverlay(app, {
   onRegenerate: () => {
-    seed = (Math.random() * 0x7fffffff) | 0;
-    regenerate();
+    seed = rand();
+    if (mode === 'attract') startAttract();
+    else newPlayBoard();
   },
   onToggleMountains: (style) => view.setMountainStyle(style),
+  onPlay: () => startPlay(),
 });
 
 const game = new Game(view, {
   onHud: (d) => overlay.setHud(d),
   onResult: (status) => overlay.showResult(status === 'won'),
 });
-view.onTick = (dt) => game.tick(dt);
-view.onLeak = () => game.leak();
 
-function regenerate(): void {
+view.onTick = (dt) => {
+  if (mode === 'attract') demoTick(dt);
+  else game.tick(dt);
+};
+view.onLeak = () => {
+  if (mode === 'play') game.leak();
+};
+
+function setSeedInfo(): void {
+  overlay.setSeedInfo(`seed ${seed} · ${board.cells.size} cells · path ${board.path.length}`);
+}
+
+/** Place one of each tower type on a buildable cell along the path (demo). */
+function placeDemoTowers(): void {
+  const placed = new Set<number>();
+  let ti = 0;
+  for (const pid of board.path) {
+    if (ti >= TOWERS.length) break;
+    const pc = board.cells.get(pid);
+    if (!pc) continue;
+    for (const nb of pc.neighbors) {
+      const c = board.cells.get(nb);
+      if (c && c.terrain === 'buildable' && !placed.has(nb)) {
+        view.spawnTower(nb, TOWERS[ti]!.key);
+        placed.add(nb);
+        ti++;
+        break;
+      }
+    }
+  }
+}
+
+function demoTick(dt: number): void {
+  demoTimer -= dt;
+  if (demoTimer <= 0) {
+    const key = ENEMIES[(Math.random() * ENEMIES.length) | 0]!.key;
+    view.spawnEnemy(key);
+    demoTimer = 0.6 + Math.random() * 0.7;
+  }
+}
+
+/** Attract mode: autoplay a demo (one of each tower + random enemies) + title. */
+function startAttract(): void {
+  mode = 'attract';
   overlay.closePalette();
   overlay.hideResult();
   board = generateBoard(seed, { targetCells: 130 });
   view.setBoard(board);
   view.highlightCell(null);
-  overlay.setSeedInfo(`seed ${seed} · ${board.cells.size} cells · path ${board.path.length}`);
+  setSeedInfo();
+  overlay.setCellInfo('Attract demo — press PLAY to start.');
+  placeDemoTowers();
+  demoTimer = 0.3;
+  overlay.showTitle();
+}
+
+/** PLAY: clear the demo units and start the real game on the current board. */
+function startPlay(): void {
+  mode = 'play';
+  overlay.hideTitle();
+  view.clearUnits();
   overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
   game.reset();
 }
 
-regenerate();
+function newPlayBoard(): void {
+  mode = 'play';
+  overlay.closePalette();
+  overlay.hideResult();
+  overlay.hideTitle();
+  board = generateBoard(seed, { targetCells: 130 });
+  view.setBoard(board);
+  view.highlightCell(null);
+  setSeedInfo();
+  overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
+  game.reset();
+}
+
+startAttract();
 view.start();
 
 // --- tap detection (distinguish tap from drag/scroll) --------------------
@@ -56,6 +129,7 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointerup', (e) => {
   const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
   if (moved > 12 || performance.now() - downT > 600) return;
+  if (mode !== 'play') return; // no placement during the attract demo
   const hit = view.pick(e.clientX, e.clientY);
   view.highlightCell(hit?.cell ?? null);
   if (!hit) {

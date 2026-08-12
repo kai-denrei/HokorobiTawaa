@@ -195,6 +195,46 @@ html, body {
   border-top: 1px solid rgba(31,122,63,0.3);
 }
 
+/* ---- attract / title screen ---- */
+.hk-title {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* demo stays visible + interactive-free behind */
+  background:
+    radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%),
+    linear-gradient(rgba(0,0,0,0.25), rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,0.35));
+}
+.hk-title.is-open { display: flex; }
+.hk-title-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.hk-title-name {
+  font-size: 30px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hk-green);
+  text-shadow: 0 0 20px rgba(53,255,122,0.6), 0 2px 12px rgba(0,0,0,0.9);
+}
+.hk-title-name .hk-kanji { font-size: 34px; }
+.hk-title-tag { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--hk-green); opacity: 0.6; margin-bottom: 18px; }
+.hk-play {
+  pointer-events: auto;
+  font: inherit;
+  font-size: 20px;
+  letter-spacing: 0.1em;
+  color: #041;
+  background: var(--hk-green);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 48px;
+  cursor: pointer;
+  box-shadow: 0 0 30px rgba(53,255,122,0.5);
+}
+.hk-play:active { transform: translateY(1px); }
+.hk-title-demo { font-size: 11px; letter-spacing: 0.14em; color: var(--hk-green); opacity: 0.4; margin-top: 16px; }
+
 /* ---- HUD (lives / wave / timer) ---- */
 .hk-hud {
   position: fixed;

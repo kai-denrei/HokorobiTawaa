@@ -25,11 +25,14 @@ export type Overlay = {
   setHud: (data: HudData) => void;
   showResult: (won: boolean) => void;
   hideResult: () => void;
+  showTitle: () => void;
+  hideTitle: () => void;
 };
 
 export type OverlayHandlers = {
   onRegenerate: () => void;
   onToggleMountains: (style: 'wire' | 'solid') => void;
+  onPlay: () => void;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -153,7 +156,19 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   resultInner.append(resultTitle, resultSub, resultBtn);
   result.append(resultInner);
 
-  root.append(top, hud, scrim, bottom, sheet, result);
+  // --- attract / title screen (shown over the autoplaying demo) -----------
+  const titleScreen = el('div', 'hk-title');
+  const titleInner = el('div', 'hk-title-inner');
+  const titleName = el('div', 'hk-title-name');
+  titleName.innerHTML = '<span class="hk-kanji">繕</span> HokorobiTawaa';
+  const titleTag = el('div', 'hk-title-tag', 'procedural wireframe tower defense');
+  const playBtn = el('button', 'hk-play', '▶ PLAY');
+  playBtn.addEventListener('click', () => handlers.onPlay());
+  const titleDemo = el('div', 'hk-title-demo', '· demo running ·');
+  titleInner.append(titleName, titleTag, playBtn, titleDemo);
+  titleScreen.append(titleInner);
+
+  root.append(top, hud, scrim, bottom, sheet, result, titleScreen);
 
   return {
     setCellInfo: (text) => {
@@ -178,5 +193,10 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
       result.classList.add('is-open');
     },
     hideResult: () => result.classList.remove('is-open'),
+    showTitle: () => {
+      hud.innerHTML = '';
+      titleScreen.classList.add('is-open');
+    },
+    hideTitle: () => titleScreen.classList.remove('is-open'),
   };
 }
