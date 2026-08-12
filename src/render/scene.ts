@@ -57,9 +57,11 @@ export class BoardView {
     this.scene.background = new THREE.Color(THEME.background);
     this.scene.add(this.boardGroup);
 
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
-    this.camera.position.set(0, 0.82, 0.96);
-    this.camera.lookAt(0, 0, 0);
+    this.camera = new THREE.PerspectiveCamera(44, 1, 0.01, 100);
+    // Steep tilted view, pulled back to frame the whole [-0.5,0.5]² board with
+    // even margins (little sky, near edge clear of the bottom HUD).
+    this.camera.position.set(0, 1.62, 1.12);
+    this.camera.lookAt(0, 0, 0.04);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));

@@ -22,6 +22,9 @@ Newest first. Surfaced in-app via the version badge → Dev Log tab.
   (raycast to ground plane → point-in-polygon). Regenerate button reseeds.
 - PWA: manifest + service worker (installable, offline shell).
 - Cache-busting version badge wired to open this Dev Log and the Rules.
+- **Verified** headless (cached Chromium): WebGL live, zero console errors,
+  board renders, badge opens this panel, HUD reads seed/cells/path. Tilted
+  camera reframed to fit the whole board above the bottom HUD.
 
 ### Next
 
