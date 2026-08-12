@@ -86,6 +86,26 @@ canvas.addEventListener('pointerup', (e) => {
     view.highlightCell(cell ?? null);
     return cell ? cell.id : null;
   },
+  // line the path with towers (one buildable neighbour per path cell)
+  spawnGauntlet: () => {
+    const keys = TOWERS.map((t) => t.key);
+    const placed = new Set<number>();
+    let n = 0;
+    for (const pid of board.path) {
+      const pc = board.cells.get(pid);
+      if (!pc) continue;
+      for (const nb of pc.neighbors) {
+        const c = board.cells.get(nb);
+        if (c && c.terrain === 'buildable' && !placed.has(nb)) {
+          view.spawnTower(nb, keys[n % keys.length]!);
+          placed.add(nb);
+          n++;
+          break;
+        }
+      }
+    }
+    return n;
+  },
   spawnEveryEnemy: () => ENEMIES.map((e) => view.spawnEnemy(e.key)),
   spawnSomeTowers: () => {
     const buildable = [...board.cells.values()].filter((c) => c.terrain === 'buildable');

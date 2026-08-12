@@ -61,6 +61,10 @@ export class BoardView {
   private mountainStyle: MountainStyle = 'solid';
   private unitsGroup = new THREE.Group();
   private units: Unit[] = [];
+  private towers: Unit[] = [];
+  private enemies: Enemy[] = [];
+  private effectsGroup = new THREE.Group();
+  private effects: { line: THREE.Line; mat: THREE.LineBasicMaterial; ttl: number; max: number }[] = [];
   private towerScale = 0.045;
   private enemyScale = 0.03;
   private clockStart = 0;
@@ -76,6 +80,7 @@ export class BoardView {
     this.scene.background = new THREE.Color(THEME.background);
     this.scene.add(this.boardGroup);
     this.scene.add(this.unitsGroup);
+    this.scene.add(this.effectsGroup);
 
     // Lighting only affects the solid (Standard-material) mountains; the
     // wireframe board uses LineBasicMaterial and ignores lights entirely.
@@ -234,6 +239,7 @@ export class BoardView {
     u.placeAt(w[0], w[2], WALL_HEIGHT); // on top of the raised buildable platform
     this.unitsGroup.add(u.object);
     this.units.push(u);
+    this.towers.push(u);
     return def.label;
   }
 
@@ -247,9 +253,12 @@ export class BoardView {
       return new THREE.Vector3(w[0], 0, w[2]);
     });
     if (pts.length < 2) return null;
-    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.11);
+    // stagger successive spawns along the path so they march as a column
+    const stagger = (this.enemies.length % 24) * 0.025;
+    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.13, stagger);
     this.unitsGroup.add(e.object);
     this.units.push(e);
+    this.enemies.push(e);
     return def.label;
   }
 
@@ -259,10 +268,94 @@ export class BoardView {
       u.dispose();
     }
     this.units = [];
+    this.towers = [];
+    this.enemies = [];
+    for (const e of this.effects) {
+      this.effectsGroup.remove(e.line);
+      e.line.geometry.dispose();
+      e.mat.dispose();
+    }
+    this.effects = [];
   }
 
   get unitCount(): number {
     return this.units.length;
+  }
+
+  get enemyCount(): number {
+    return this.enemies.length;
+  }
+
+  /** Towers acquire the nearest live enemy in range and fire on cooldown. */
+  private stepCombat(dt: number): void {
+    if (this.towers.length === 0 || this.enemies.length === 0) return;
+    for (const t of this.towers) {
+      t.cooldown -= dt;
+      if (t.cooldown > 0) continue;
+      const range = t.def.range ?? 0;
+      const dmg = t.def.damage ?? 0;
+      const rate = t.def.fireRate ?? 0;
+      if (range <= 0 || dmg <= 0 || rate <= 0) continue;
+      const tp = t.object.position;
+      let best: Enemy | null = null;
+      let bestD = range;
+      for (const e of this.enemies) {
+        if (!e.alive) continue;
+        const ep = e.object.position;
+        const d = Math.hypot(tp.x - ep.x, tp.z - ep.z); // XZ — tower elevation ignored
+        if (d <= bestD) {
+          bestD = d;
+          best = e;
+        }
+      }
+      if (best) {
+        best.damage(dmg);
+        t.cooldown = 1 / rate;
+        this.spawnBolt(tp, best.object.position);
+      }
+    }
+
+    if (this.enemies.some((e) => !e.alive)) {
+      const dead = new Set(this.enemies.filter((e) => !e.alive));
+      for (const e of dead) {
+        this.unitsGroup.remove(e.object);
+        e.dispose();
+      }
+      this.enemies = this.enemies.filter((e) => e.alive);
+      this.units = this.units.filter((u) => !dead.has(u as Enemy));
+    }
+  }
+
+  /** A brief additive bolt from tower to target (fades over its lifetime). */
+  private spawnBolt(from: THREE.Vector3, to: THREE.Vector3): void {
+    const geo = new THREE.BufferGeometry().setFromPoints([from.clone(), to.clone()]);
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xe8fff0,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const line = new THREE.Line(geo, mat);
+    this.effectsGroup.add(line);
+    this.effects.push({ line, mat, ttl: 0.13, max: 0.13 });
+  }
+
+  private updateEffects(dt: number): void {
+    if (this.effects.length === 0) return;
+    const keep: typeof this.effects = [];
+    for (const e of this.effects) {
+      e.ttl -= dt;
+      if (e.ttl <= 0) {
+        this.effectsGroup.remove(e.line);
+        e.line.geometry.dispose();
+        e.mat.dispose();
+      } else {
+        e.mat.opacity = e.ttl / e.max;
+        keep.push(e);
+      }
+    }
+    this.effects = keep;
   }
 
   private addMarker(cell: Cell, color: number): void {
@@ -357,6 +450,8 @@ export class BoardView {
       this.lastT = now;
       const elapsed = now - this.clockStart;
       for (const u of this.units) u.update(dt, elapsed);
+      this.stepCombat(dt);
+      this.updateEffects(dt);
       this.composer.render();
       requestAnimationFrame(loop);
     };

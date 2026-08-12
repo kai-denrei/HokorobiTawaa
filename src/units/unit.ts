@@ -40,6 +40,20 @@ function bakeRotX(src: Float32Array, rot: number): Float32Array {
   return out;
 }
 
+/** Fisher–Yates over point triples so truncating the draw range thins the cloud
+ * uniformly (HP-as-density) rather than eroding one structured region. */
+function shuffleTriples(a: Float32Array): void {
+  const n = a.length / 3;
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    for (let k = 0; k < 3; k++) {
+      const t = a[i * 3 + k]!;
+      a[i * 3 + k] = a[j * 3 + k]!;
+      a[j * 3 + k] = t;
+    }
+  }
+}
+
 export class Unit {
   readonly object: THREE.Points;
   protected readonly geo: THREE.BufferGeometry;
@@ -47,12 +61,18 @@ export class Unit {
   protected readonly baseScale: number;
   protected readonly restY: number;
   protected readonly phase: number;
+  protected readonly count: number;
   protected baseY = 0;
+  /** Seconds until this tower can fire again (combat state). */
+  cooldown = 0;
 
   constructor(readonly def: UnitDef, scale: number, seedIndex: number) {
     const shape = SHAPES[def.key]!;
+    this.count = shape.count;
+    const baked = bakeRotX(shape.positions, def.rotX ?? 0);
+    shuffleTriples(baked);
     this.geo = new THREE.BufferGeometry();
-    this.geo.setAttribute('position', new THREE.BufferAttribute(bakeRotX(shape.positions, def.rotX ?? 0), 3));
+    this.geo.setAttribute('position', new THREE.BufferAttribute(baked, 3));
     this.mat = new THREE.PointsMaterial({
       color: def.color,
       size: scale * 0.14,
@@ -96,6 +116,12 @@ export class Unit {
     }
   }
 
+  /** Show only `frac` of the (pre-shuffled) dots — HP rendered as dot density. */
+  setDensity(frac: number): void {
+    const n = Math.max(3, Math.floor(this.count * Math.max(0, Math.min(1, frac))));
+    this.geo.setDrawRange(0, n);
+  }
+
   /** Static placement (towers). `baseY` lifts the unit onto a platform top. */
   placeAt(worldX: number, worldZ: number, baseY = 0): void {
     this.baseY = baseY;
@@ -118,6 +144,9 @@ export class Enemy extends Unit {
   private readonly cum: number[] = [0];
   private readonly total: number;
   private dist = 0;
+  hp: number;
+  readonly maxHp: number;
+  alive = true;
 
   constructor(
     def: UnitDef,
@@ -125,12 +154,32 @@ export class Enemy extends Unit {
     seedIndex: number,
     private readonly path: THREE.Vector3[],
     private readonly speed: number,
+    startDist = 0,
   ) {
     super(def, scale, seedIndex);
+    this.maxHp = def.hp ?? 50;
+    this.hp = this.maxHp;
     for (let i = 1; i < path.length; i++) {
       this.cum[i] = this.cum[i - 1]! + path[i]!.distanceTo(path[i - 1]!);
     }
     this.total = this.cum[this.cum.length - 1] || 1;
+    this.dist = ((startDist % this.total) + this.total) % this.total;
+  }
+
+  /** Apply damage; die at 0 HP, otherwise thin the dot cloud to show damage. */
+  damage(d: number): void {
+    if (!this.alive) return;
+    this.hp -= d;
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.alive = false;
+    } else {
+      this.setDensity(this.hp / this.maxHp);
+    }
+  }
+
+  worldPos(): THREE.Vector3 {
+    return this.object.position;
   }
 
   override update(dt: number, elapsed: number): void {

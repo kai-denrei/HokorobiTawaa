@@ -2,6 +2,21 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — First combat (towers fire, enemies take damage)
+
+- Enemies now have distinct colours: Butterfly cyan, Breathing Cloud violet,
+  Torus Knot red, Nautilus Shell gold, Wave Ghost pink.
+- Towers gained range / fire-rate / damage; enemies gained HP. Each frame every
+  tower acquires the nearest live enemy within range and fires on cooldown,
+  drawing a brief additive bolt to the target.
+- Damage thins the enemy's dot cloud (HP-as-density, via a pre-shuffled point
+  buffer + drawRange) and the enemy is removed at 0 HP. Tanky types (Cloud 130,
+  Knot 220) visibly outlast swarm types (Butterfly 24).
+- Enemy spawns are staggered along the path so they march as a column.
+- Dev hook `__hk.spawnGauntlet()` lines the path with towers for testing.
+- Still a first pass: single-target only (no AoE/slow/lightning specialisation),
+  no economy/lives/waves yet.
+
 ## 2026-08-12 — Edge-only movement & full-cell highlight
 
 - Adjacency is now EDGE-only: cells that merely touch at a corner (quad diagonal)
