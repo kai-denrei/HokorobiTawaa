@@ -48,20 +48,28 @@ function setSeedInfo(): void {
   overlay.setSeedInfo(`seed ${seed} · ${board.cells.size} cells · path ${board.path.length}`);
 }
 
-/** Place one of each tower type on a buildable cell along the path (demo). */
+/** Place one of each tower type, spread evenly along the whole path (demo). */
 function placeDemoTowers(): void {
   const placed = new Set<number>();
-  let ti = 0;
-  for (const pid of board.path) {
-    if (ti >= TOWERS.length) break;
-    const pc = board.cells.get(pid);
-    if (!pc) continue;
+  const n = TOWERS.length;
+  const pathLen = board.path.length;
+  const freeNeighbor = (pathIdx: number): number | null => {
+    const pc = board.cells.get(board.path[pathIdx]!);
+    if (!pc) return null;
     for (const nb of pc.neighbors) {
       const c = board.cells.get(nb);
-      if (c && c.terrain === 'buildable' && !placed.has(nb)) {
-        view.spawnTower(nb, TOWERS[ti]!.key);
-        placed.add(nb);
-        ti++;
+      if (c && c.terrain === 'buildable' && !placed.has(nb)) return nb;
+    }
+    return null;
+  };
+  for (let i = 0; i < n; i++) {
+    const target = Math.floor(((i + 0.5) / n) * pathLen);
+    // search outward from the evenly-spaced target for a free buildable neighbour
+    for (let off = 0; off < pathLen; off++) {
+      const cand = freeNeighbor(Math.min(pathLen - 1, target + off)) ?? freeNeighbor(Math.max(0, target - off));
+      if (cand != null) {
+        view.spawnTower(cand, TOWERS[i]!.key);
+        placed.add(cand);
         break;
       }
     }
