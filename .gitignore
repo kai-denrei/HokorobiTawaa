@@ -2,3 +2,6 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# deban decision log — local private working memory
+.deban/

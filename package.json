@@ -1,0 +1,26 @@
+{
+  "name": "hokorobitawaa",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mobile-first PWA tower defense on a procedural Stalberg board, green-on-black wireframe.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bump": "node scripts/bump-version.mjs"
+  },
+  "dependencies": {
+    "delaunator": "^5.0.1",
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/delaunator": "^5.0.3",
+    "@types/three": "^0.169.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}
