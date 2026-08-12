@@ -2,6 +2,13 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-12 — Published
+
+- Live: **https://kai-denrei.github.io/HokorobiTawaa/** (GitHub Pages, auto-deploy
+  on push to main via `.github/workflows/pages.yml`).
+- Repo: https://github.com/kai-denrei/HokorobiTawaa (public).
+- Demo towers now placed dispersed evenly along the whole path.
+
 ## 2026-08-12 — Attract mode + PLAY
 
 - On load the game now boots into an **attract demo**: one of each tower is
