@@ -101,6 +101,15 @@ html, body {
 }
 .hk-btn:active { transform: translateY(1px); }
 
+.hk-controls { display: flex; align-items: center; gap: 8px; }
+.hk-btn-ghost {
+  color: var(--hk-green);
+  background: rgba(3, 20, 10, 0.7);
+  border: 1px solid var(--hk-green-dim);
+  box-shadow: none;
+}
+.hk-btn-ghost:hover { border-color: var(--hk-green); box-shadow: 0 0 10px rgba(53,255,122,0.3); }
+
 /* ---- panel ---- */
 .hk-scrim {
   position: fixed;

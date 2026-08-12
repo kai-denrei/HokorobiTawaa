@@ -10,7 +10,9 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import type { Board, Cell, Vec2 } from '../board';
-import { THEME, BLOOM } from './theme';
+import { THEME, BLOOM, MOUNTAIN_LEAN } from './theme';
+
+export type MountainStyle = 'wire' | 'solid';
 
 const toWorld = (p: Vec2): [number, number, number] => [p[0] - 0.5, 0, p[1] - 0.5];
 
@@ -55,6 +57,7 @@ export class BoardView {
   private boardGroup = new THREE.Group();
   private highlight: THREE.LineLoop | null = null;
   private board: Board | null = null;
+  private mountainStyle: MountainStyle = 'wire';
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private disposables: { dispose(): void }[] = [];
@@ -65,6 +68,13 @@ export class BoardView {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.scene.background = new THREE.Color(THEME.background);
     this.scene.add(this.boardGroup);
+
+    // Lighting only affects the solid (Standard-material) mountains; the
+    // wireframe board uses LineBasicMaterial and ignores lights entirely.
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    key.position.set(-0.8, 1.2, 0.5);
+    this.scene.add(key);
 
     this.camera = new THREE.PerspectiveCamera(44, 1, 0.01, 100);
     // Steep tilted view, pulled back to frame the whole [-0.5,0.5]² board with
@@ -91,10 +101,12 @@ export class BoardView {
     const buildableSegs: number[] = [];
     const pathSegs: number[] = [];
     const mountainSegs: number[] = [];
+    const mountainTris: number[] = [];
 
     for (const cell of board.cells.values()) {
       if (cell.terrain === 'blocked') {
-        this.pushMountain(mountainSegs, cell);
+        if (this.mountainStyle === 'solid') this.pushMountainSolid(mountainTris, cell);
+        else this.pushMountain(mountainSegs, cell);
         continue;
       }
       const target = cell.terrain === 'path' || cell.terrain === 'spawn' || cell.terrain === 'base'
@@ -110,7 +122,8 @@ export class BoardView {
 
     this.addLineSegments(buildableSegs, THEME.buildable, THEME.buildableDim);
     this.addLineSegments(pathSegs, THEME.path, 1.0);
-    this.addLineSegments(mountainSegs, THEME.mountain, 0.95);
+    this.addLineSegments(mountainSegs, THEME.mountainWire, 0.95);
+    this.addSolidMountains(mountainTris);
 
     // Accent markers for spawn(s) and base — small upright rings.
     for (const s of board.spawns) this.addMarker(board.cells.get(s)!, THEME.spawn);
@@ -132,32 +145,71 @@ export class BoardView {
   }
 
   /**
-   * A blocked cell becomes a pyramid whose base IS the cell's own (irregular)
-   * polygon, rising to a single apex over the cell centre. Height and apex
-   * offset vary deterministically per cell, so peaks are uneven and natural
-   * rather than uniform cones dropped on top of the grid. Emits base-edge +
-   * rib segments into the shared mountain batch.
+   * Apex of the mountain over `cell`. Base is always the cell's own (irregular)
+   * polygon; height varies deterministically per cell, but every apex leans the
+   * SAME direction (MOUNTAIN_LEAN, scaled by height) so all peaks tilt uniformly
+   * and read as a single perspective/wind direction.
    */
+  private mountainApex(cell: Cell): { x: number; y: number; z: number } {
+    const r = cellRadius(cell);
+    const height = r * (1.7 + hash01(cell.id) * 1.9);
+    return {
+      x: cell.center[0] - 0.5 + height * MOUNTAIN_LEAN.x,
+      y: height,
+      z: cell.center[1] - 0.5 + height * MOUNTAIN_LEAN.z,
+    };
+  }
+
+  /** Wireframe pyramid: base edges + ribs up to the apex. */
   private pushMountain(target: number[], cell: Cell): void {
     const poly = cell.polygon;
     const n = poly.length;
     if (n < 3) return;
-    const r = cellRadius(cell);
-    const height = r * (1.7 + hash01(cell.id) * 1.9);
-    // Lean the apex slightly off-centre for an organic, uneven peak.
-    const ox = (hash01(cell.id * 2 + 1) - 0.5) * r * 0.6;
-    const oz = (hash01(cell.id * 2 + 7) - 0.5) * r * 0.6;
-    const apexX = cell.center[0] - 0.5 + ox;
-    const apexZ = cell.center[1] - 0.5 + oz;
-
+    const apex = this.mountainApex(cell);
     for (let i = 0; i < n; i++) {
       const a = toWorld(poly[i]!);
       const b = toWorld(poly[(i + 1) % n]!);
-      // base edge (the cell's own outline, on the ground plane)
-      target.push(a[0], 0, a[2], b[0], 0, b[2]);
-      // rib from this base vertex up to the shared apex
-      target.push(a[0], 0, a[2], apexX, height, apexZ);
+      target.push(a[0], 0, a[2], b[0], 0, b[2]); // base edge
+      target.push(a[0], 0, a[2], apex.x, apex.y, apex.z); // rib
     }
+  }
+
+  /** Solid pyramid: one triangle per base edge (edge → apex). DoubleSide
+   * material makes winding irrelevant; the ground-facing base face is omitted. */
+  private pushMountainSolid(target: number[], cell: Cell): void {
+    const poly = cell.polygon;
+    const n = poly.length;
+    if (n < 3) return;
+    const apex = this.mountainApex(cell);
+    for (let i = 0; i < n; i++) {
+      const a = toWorld(poly[i]!);
+      const b = toWorld(poly[(i + 1) % n]!);
+      target.push(a[0], 0, a[2], b[0], 0, b[2], apex.x, apex.y, apex.z);
+    }
+  }
+
+  private addSolidMountains(positions: number[]): void {
+    if (positions.length === 0) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({
+      color: THEME.mountainSolid,
+      roughness: 0.85,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+      flatShading: true,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    this.boardGroup.add(mesh);
+    this.disposables.push(geo, mat);
+  }
+
+  /** Switch mountains between wireframe and solid; rebuilds the current board. */
+  setMountainStyle(style: MountainStyle): void {
+    if (this.mountainStyle === style) return;
+    this.mountainStyle = style;
+    if (this.board) this.setBoard(this.board);
   }
 
   private addMarker(cell: Cell, color: number): void {

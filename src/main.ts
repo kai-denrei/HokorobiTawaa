@@ -15,6 +15,7 @@ const overlay = createOverlay(app, {
     seed = (Math.random() * 0x7fffffff) | 0;
     regenerate();
   },
+  onToggleMountains: (style) => view.setMountainStyle(style),
 });
 
 function regenerate(): void {

@@ -14,6 +14,7 @@ export type Overlay = {
 
 export type OverlayHandlers = {
   onRegenerate: () => void;
+  onToggleMountains: (style: 'wire' | 'solid') => void;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -81,9 +82,21 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const seedInfo = el('div', 'hk-seed', '');
   const regen = el('button', 'hk-btn', '↻ Regenerate');
   regen.addEventListener('click', () => handlers.onRegenerate());
+
+  let mountainSolid = false;
+  const toggle = el('button', 'hk-btn hk-btn-ghost', '⛰ Wire');
+  toggle.title = 'Toggle mountains: wireframe / solid';
+  toggle.addEventListener('click', () => {
+    mountainSolid = !mountainSolid;
+    toggle.textContent = mountainSolid ? '⛰ Solid' : '⛰ Wire';
+    handlers.onToggleMountains(mountainSolid ? 'solid' : 'wire');
+  });
+
   const left = el('div', 'hk-bottom-left');
   left.append(info, seedInfo);
-  bottom.append(left, regen);
+  const controls = el('div', 'hk-controls');
+  controls.append(toggle, regen);
+  bottom.append(left, controls);
 
   root.append(top, scrim, bottom);
 
