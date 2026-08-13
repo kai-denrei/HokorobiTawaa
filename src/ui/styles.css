@@ -235,6 +235,28 @@ html, body {
 .hk-play:active { transform: translateY(1px); }
 .hk-title-demo { font-size: 11px; letter-spacing: 0.14em; color: var(--hk-green); opacity: 0.4; margin-top: 16px; }
 
+/* ---- health widget (heart meter) ---- */
+.hk-health {
+  position: fixed;
+  top: calc(max(env(safe-area-inset-top), 10px) + 34px);
+  left: 12px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  pointer-events: none;
+}
+.hk-health canvas { display: block; filter: drop-shadow(0 0 6px rgba(90,255,170,0.4)); }
+.hk-health-n {
+  margin-top: -6px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: #5affd0;
+  text-shadow: 0 0 8px rgba(90,255,170,0.5);
+}
+.hk-health-n.hk-health-low { color: #ff6a6a; text-shadow: 0 0 10px rgba(255,80,80,0.7); }
+
 /* ---- HUD (lives / wave / timer) ---- */
 .hk-hud {
   position: fixed;

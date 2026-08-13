@@ -2,6 +2,17 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-13 — Heart health meter + hurt effect
+
+- Lives are now shown as the Braille "Heart" halftone point cloud (top-left),
+  **breathing** to represent health; its dot density = lives/maxLives.
+- On every leak (life lost) it snaps to the **Wave** treatment and flashes
+  **red with an explosion pulse** (dots scatter outward), then settles back to
+  green breathing — the requested "hurt" feedback.
+- Self-contained 2D-canvas widget (src/ui/heart-meter.ts), ported Heart shape +
+  breathe/wave treatments from Braille. HUD numeric ♥ replaced by the meter +
+  a small live count. Triggered from onLeak; maxLives added to the HUD state.
+
 ## 2026-08-13 — Damage-type visual identity
 
 - Projectiles now render via a per-vertex size+colour shader, so each tower has

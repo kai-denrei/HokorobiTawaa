@@ -10,6 +10,7 @@ export type GameStatus = 'ready' | 'active' | 'won' | 'lost';
 
 export type HudState = {
   lives: number;
+  maxLives: number;
   gold: number;
   mult: number;
   wave: number; // 1-based; 0 before the first wave
@@ -197,6 +198,7 @@ export class Game {
     }
     this.cb.onHud({
       lives: this.lives,
+      maxLives: START_LIVES,
       gold: this.gold,
       mult: this.multiplier(),
       wave: Math.max(0, this.waveIndex + 1),

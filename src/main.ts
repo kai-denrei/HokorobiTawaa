@@ -38,7 +38,10 @@ view.onTick = (dt) => {
   else game.tick(dt);
 };
 view.onLeak = () => {
-  if (mode === 'play') game.leak();
+  if (mode === 'play') {
+    game.leak();
+    overlay.hitHeart(); // heart flashes red + wave on every life lost
+  }
 };
 view.onKill = (e) => {
   if (mode === 'play') game.onKill(e);
@@ -211,6 +214,11 @@ canvas.addEventListener('pointerup', (e) => {
 (window as unknown as { __hk?: unknown }).__hk = {
   view,
   game,
+  overlay,
+  hurt: () => {
+    game.leak();
+    overlay.hitHeart();
+  },
   get board() {
     return board;
   },

@@ -6,11 +6,13 @@ import devlogRaw from '../../DEVLOG.md?raw';
 import rulesRaw from '../../RULES.md?raw';
 import { renderMarkdown } from './markdown';
 import { BUILD } from '../version';
+import { HeartMeter } from './heart-meter';
 
 export type PaletteItem = { key: string; label: string; role: string; cost?: number; affordable?: boolean };
 
 export type HudData = {
   lives: number;
+  maxLives: number;
   gold: number;
   mult: number;
   wave: number;
@@ -34,6 +36,7 @@ export type Overlay = {
   openTowerMenu: (info: TowerMenuInfo, on: { onUpgrade: () => void; onSell: () => void }) => void;
   closePalette: () => void;
   setHud: (data: HudData) => void;
+  hitHeart: () => void;
   showResult: (won: boolean) => void;
   hideResult: () => void;
   showTitle: () => void;
@@ -191,6 +194,13 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   // --- HUD (lives / wave / timer) -----------------------------------------
   const hud = el('div', 'hk-hud');
 
+  // --- health widget: animated Heart meter (lives) ------------------------
+  const health = el('div', 'hk-health');
+  const heart = new HeartMeter(74);
+  const livesLabel = el('div', 'hk-health-n', '15');
+  health.append(heart.canvas, livesLabel);
+  heart.start();
+
   // --- win / lose result screen -------------------------------------------
   const result = el('div', 'hk-result');
   const resultInner = el('div', 'hk-result-inner');
@@ -213,7 +223,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   titleInner.append(titleName, titleTag, playBtn, titleDemo);
   titleScreen.append(titleInner);
 
-  root.append(top, hud, scrim, bottom, sheet, result, titleScreen);
+  root.append(top, hud, health, scrim, bottom, sheet, result, titleScreen);
 
   return {
     setCellInfo: (text) => {
@@ -226,14 +236,16 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     openTowerMenu,
     closePalette,
     setHud: (data) => {
-      const low = data.lives <= 3 ? ' hk-lives-low' : '';
+      heart.setLives(data.maxLives ? data.lives / data.maxLives : 1);
+      livesLabel.textContent = String(data.lives);
+      livesLabel.classList.toggle('hk-health-low', data.lives <= 3);
       hud.innerHTML =
-        `<span class="hk-lives${low}">♥ ${data.lives}</span>` +
         `<span class="hk-gold">◆ ${data.gold}</span>` +
         `<span class="hk-mult">×${data.mult.toFixed(1)}</span>` +
         `<span class="hk-wave">W ${data.wave}/${data.totalWaves}</span>` +
         `<span class="hk-msg">${data.message}</span>`;
     },
+    hitHeart: () => heart.hit(),
     showResult: (won) => {
       resultTitle.textContent = won ? 'VICTORY' : 'GAME OVER';
       resultTitle.classList.toggle('is-won', won);
