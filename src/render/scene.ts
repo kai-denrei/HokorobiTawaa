@@ -197,6 +197,13 @@ export class BoardView {
       this.scene.remove(this.pathAnim.group);
       this.pathAnim = null;
     }
+
+    // adapt unit sizes to this board's cell size (denser board → smaller cells
+    // → smaller towers/enemies) so they always sit sensibly on a platform.
+    const radii = [...board.cells.values()].map((c) => cellRadius(c)).sort((a, b) => a - b);
+    const medR = radii.length ? radii[radii.length >> 1]! : 0.05;
+    this.towerScale = medR * 0.72; // tower footprint ≈ 0.7× the cell radius
+    this.enemyScale = medR * 0.5;
     this.clearGroup();
     this.clearUnits();
     this.buildTerrain();
