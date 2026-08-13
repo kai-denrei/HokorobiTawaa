@@ -13,6 +13,8 @@ Newest first. Surfaced in-app via the version badge → Dev Log tab.
 - src/units/heart.ts (pure shape + breathe/wave) + src/render/heart-base.ts (the
   3D meter, updated in the render loop). Driven by view.setBaseLives / hitBase
   from the game; numeric ♥ stays in the HUD. (Old DOM heart widget removed.)
+- Removed the treatments' Y-spin and angled the heart to face the camera
+  (lookAt) so its silhouette reads clearly as a ❤ instead of spinning edge-on.
 
 ## 2026-08-13 — Damage-type visual identity
 

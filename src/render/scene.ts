@@ -189,6 +189,9 @@ export class BoardView {
     const bw = toWorld(board.cells.get(board.base)!.center);
     this.baseHeart = new HeartBase(bw[0], bw[2], 0.095);
     this.scene.add(this.baseHeart.object);
+    // angle the heart to face the camera so its silhouette reads as a ❤
+    // (the shape is symmetric front-to-back, so facing either way is fine).
+    this.baseHeart.object.lookAt(this.camera.position);
   }
 
   /** (Re)build only the terrain geometry (boardGroup) from the current board —

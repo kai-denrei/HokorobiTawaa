@@ -22,11 +22,6 @@ function fitUnit(pts: P[]): P[] {
   if (m < 1e-9) m = 1;
   return pts.map((p) => [p[0]! / m, p[1]! / m, p[2]! / m]);
 }
-function rotY(p: P, a: number): P {
-  const c = Math.cos(a);
-  const s = Math.sin(a);
-  return [p[0]! * c + p[2]! * s, p[1]!, -p[0]! * s + p[2]! * c];
-}
 function heartF(x: number, y: number, z: number): number {
   const X = x;
   const Y = z;
@@ -65,16 +60,17 @@ export function heartPointsShuffled(): P[] {
   return pts;
 }
 
-/** Resting "health" motion: gentle scale pulse + slow spin. */
+/** Resting "health" motion: gentle scale pulse (no spin, so the ❤ silhouette
+ * stays face-on). */
 export function breathe(base: P[], t: number): P[] {
   const s = 1 + 0.17 * Math.sin(t * 2);
-  return base.map((p) => rotY([p[0]! * s, p[1]! * s, p[2]! * s], t * 0.3));
+  return base.map((p) => [p[0]! * s, p[1]! * s, p[2]! * s]);
 }
 
-/** "Hurt" motion: radial ripple + slow spin. */
+/** "Hurt" motion: radial ripple across the silhouette (no spin). */
 export function wave(base: P[], t: number): P[] {
   return base.map((p) => {
     const d = 1 + 0.14 * Math.sin(3 * Math.atan2(p[2]!, p[0]!) + t * 3 - p[1]! * 2);
-    return rotY([p[0]! * d, p[1]!, p[2]! * d], t * 0.3);
+    return [p[0]! * d, p[1]!, p[2]! * d];
   });
 }
