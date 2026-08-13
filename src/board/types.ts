@@ -30,4 +30,7 @@ export type Board = {
   base: CellId;
   /** Ordered fixed route spawn → base (inclusive), all terrain 'path'. */
   path: CellId[];
+  /** Optional alternate route spawn → base, initially closed (blocked terrain);
+   * opens mid-game so enemies pick path or path2 at random. */
+  path2?: CellId[];
 };

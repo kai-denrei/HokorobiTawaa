@@ -52,7 +52,7 @@ export function bfsDistance(cells: CellMap, a: CellId, b: CellId): number {
  * reconstruction), or null if unreachable. Neighbor iteration is id-sorted
  * (neighbors are pre-sorted), so the path is deterministic.
  */
-export function bfsPath(cells: CellMap, a: CellId, b: CellId): CellId[] | null {
+export function bfsPath(cells: CellMap, a: CellId, b: CellId, avoid?: Set<CellId>): CellId[] | null {
   if (a === b) return [a];
   const parent = new Map<CellId, CellId>([[a, a]]);
   let frontier: CellId[] = [a];
@@ -61,6 +61,7 @@ export function bfsPath(cells: CellMap, a: CellId, b: CellId): CellId[] | null {
     for (const id of frontier) {
       for (const n of neighborsOf(cells, id)) {
         if (parent.has(n)) continue;
+        if (avoid && n !== b && avoid.has(n)) continue;
         parent.set(n, id);
         if (n === b) {
           const path: CellId[] = [b];

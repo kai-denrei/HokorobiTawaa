@@ -2,6 +2,19 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-13 — Second path + fixes
+
+- Radial affordability now updates live: gaining gold while a menu is open
+  unlocks an option in place (game onHud → overlay.refreshRadial + canAfford).
+- Tap picking hits the raised platform TOP (inset polygon at WALL_HEIGHT) for
+  buildable/blocked cells, then the low path footprint — so you select the tile
+  you actually see, not the ground behind it.
+- Boards now generate an alternate spawn→base route (`path2`) that avoids path1,
+  initially closed as a blocked wall ridge. Extended to 12 waves; after wave 8
+  clears, the **second path opens**: highlight → the raised tiles flash on/off →
+  they vanish into a low hallway. From then on enemies pick path1 or path2 at
+  random (50/50).
+
 ## 2026-08-13 — Enemy overhaul: bestiary, behaviours, colour schema
 
 - Towers renamed to functions (Single Shot, AoE, Rapid, Homing, Sniper, Spread,

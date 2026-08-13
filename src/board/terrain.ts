@@ -75,9 +75,20 @@ export function typeTerrain(
     if (rng() < mountainFraction) cells.get(id)!.terrain = 'blocked';
   }
 
+  // Alternate route (initially closed): a different spawn→base path that avoids
+  // path1's interior. Its interior cells are forced to 'blocked' (a wall ridge)
+  // until the game opens it mid-run.
+  const avoid = new Set(path.slice(1, -1));
+  const alt = bfsPath(cells, spawn, base, avoid);
+  let path2: CellId[] | undefined;
+  if (alt && alt.length >= 4) {
+    for (const id of alt.slice(1, -1)) cells.get(id)!.terrain = 'blocked';
+    path2 = alt;
+  }
+
   // spawn/base overwrite their path endpoints
   cells.get(spawn)!.terrain = 'spawn';
   cells.get(base)!.terrain = 'base';
 
-  return { cells, seed, spawns: [spawn], base, path };
+  return { cells, seed, spawns: [spawn], base, path, path2 };
 }

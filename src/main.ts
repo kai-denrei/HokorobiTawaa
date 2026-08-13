@@ -35,6 +35,7 @@ const game = new Game(view, {
     overlay.refreshRadial(); // gold changed → update affordability of an open menu
   },
   onResult: (status) => overlay.showResult(status === 'won'),
+  onOpenSecondPath: () => view.openSecondPath(),
 });
 
 view.onTick = (dt) => {
@@ -233,6 +234,8 @@ canvas.addEventListener('pointerup', (e) => {
     game.leak();
     view.hitBase();
   },
+  openPath: () => view.openSecondPath(),
+  hasPath2: () => !!board.path2,
   get board() {
     return board;
   },

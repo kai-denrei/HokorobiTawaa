@@ -22,6 +22,7 @@ export type HudState = {
 export type GameCallbacks = {
   onHud: (s: HudState) => void;
   onResult: (status: 'won' | 'lost') => void;
+  onOpenSecondPath?: () => void;
 };
 
 type SpawnGroup = { key: string; count: number; interval: number };
@@ -32,7 +33,10 @@ const START_DELAY = 8; // seconds before wave 1 (place your towers)
 const BETWEEN_DELAY = 6; // seconds between waves
 
 /** Per-wave HP multiplier, applied to base enemy HP. */
-const HP_SCALE = [1.0, 1.1, 1.2, 1.32, 1.44, 1.56, 1.7, 1.9];
+const HP_SCALE = [1.0, 1.1, 1.2, 1.32, 1.44, 1.56, 1.7, 1.9, 2.1, 2.35, 2.6, 3.0];
+
+/** After this wave (1-based) clears, the second path opens. */
+const OPEN_PATH_AFTER_WAVE = 8;
 
 /** Escalating waves that introduce the new behaviours in turn. */
 function buildWaves(): Wave[] {
@@ -44,7 +48,12 @@ function buildWaves(): Wave[] {
     [{ key: 'shell', count: 6, interval: 0.7 }, { key: 'gslime', count: 4, interval: 1.0 }], // armored + healers
     [{ key: 'barbed', count: 4, interval: 1.1 }, { key: 'scoutufo', count: 6, interval: 0.5 }], // accel-on-hit
     [{ key: 'cloud', count: 3, interval: 1.3 }, { key: 'rolling', count: 2, interval: 1.8 }, { key: 'ghost', count: 6, interval: 0.6 }], // epic tanks
-    [{ key: 'knot', count: 2, interval: 1.9 }, { key: 'prime', count: 1, interval: 1 }, { key: 'barbed', count: 3, interval: 1.2 }, { key: 'bslime', count: 2, interval: 1.4 }], // boss
+    [{ key: 'knot', count: 2, interval: 1.9 }, { key: 'prime', count: 1, interval: 1 }, { key: 'barbed', count: 3, interval: 1.2 }, { key: 'bslime', count: 2, interval: 1.4 }], // wave 8 — second path opens after
+    // --- two-path phase ---
+    [{ key: 'drifter', count: 4, interval: 0.8 }, { key: 'barbed', count: 4, interval: 1.0 }],
+    [{ key: 'scoutufo', count: 8, interval: 0.4 }, { key: 'gslime', count: 5, interval: 0.9 }, { key: 'rolling', count: 3, interval: 1.6 }],
+    [{ key: 'prime', count: 2, interval: 1.8 }, { key: 'cloud', count: 4, interval: 1.1 }, { key: 'bslime', count: 3, interval: 1.2 }],
+    [{ key: 'knot', count: 3, interval: 1.6 }, { key: 'prime', count: 2, interval: 1.8 }, { key: 'barbed', count: 4, interval: 1.0 }, { key: 'rolling', count: 2, interval: 1.7 }], // finale
   ];
 }
 
@@ -148,6 +157,7 @@ export class Game {
       } else {
         this.status = 'ready';
         this.countdown = BETWEEN_DELAY;
+        if (this.waveIndex + 1 === OPEN_PATH_AFTER_WAVE) this.cb.onOpenSecondPath?.();
       }
     }
     this.emitHud();

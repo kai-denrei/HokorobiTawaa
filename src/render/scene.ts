@@ -107,6 +107,9 @@ export class BoardView {
   private baseHeart: HeartBase | null = null;
   private rangeRing: THREE.LineLoop | null = null;
   private rangeTTL = 0;
+  private path2Open = false;
+  private path2Points: THREE.Vector3[] = [];
+  private pathAnim: { group: THREE.Group; t: number } | null = null;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
@@ -188,6 +191,12 @@ export class BoardView {
   /** (Re)build the visible board from a Board data structure. */
   setBoard(board: Board): void {
     this.board = board;
+    this.path2Open = false;
+    this.path2Points = [];
+    if (this.pathAnim) {
+      this.scene.remove(this.pathAnim.group);
+      this.pathAnim = null;
+    }
     this.clearGroup();
     this.clearUnits();
     this.buildTerrain();
@@ -392,10 +401,13 @@ export class BoardView {
     if (!this.board) return null;
     const def = UNIT_BY_KEY[key];
     if (!def || def.family !== 'enemy') return null;
-    const pts = this.board.path.map((id) => {
-      const w = toWorld(this.board!.cells.get(id)!.center);
-      return new THREE.Vector3(w[0], 0, w[2]);
-    });
+    const usePath2 = this.path2Open && this.path2Points.length >= 2 && Math.random() < 0.5;
+    const pts = usePath2
+      ? this.path2Points.map((v) => v.clone())
+      : this.board.path.map((id) => {
+          const w = toWorld(this.board!.cells.get(id)!.center);
+          return new THREE.Vector3(w[0], 0, w[2]);
+        });
     if (pts.length < 2) return null;
     const e = new Enemy(def, this.enemyScale, this.units.length, pts, def.speed ?? 0.12, 0, hpScale);
     this.unitsGroup.add(e.object);
@@ -442,6 +454,69 @@ export class BoardView {
 
   hitBase(): void {
     this.baseHeart?.hit();
+  }
+
+  get hasSecondPath(): boolean {
+    return !!this.board?.path2 && !this.path2Open && !this.pathAnim;
+  }
+
+  /** Open the alternate route: highlight → flash the raised tiles → they vanish
+   * into a low hallway; afterwards enemies pick path or path2 at random. */
+  openSecondPath(): void {
+    if (!this.board || !this.board.path2 || this.path2Open || this.pathAnim) return;
+    const interior = this.board.path2.slice(1, -1);
+    for (const id of interior) {
+      const c = this.board.cells.get(id);
+      if (c) c.terrain = 'path'; // data now; visuals swap when the anim ends
+    }
+    // bright overlay = the raised blocks of the opening cells (flashed)
+    const tris: number[] = [];
+    const wire: number[] = [];
+    for (const id of interior) {
+      const c = this.board.cells.get(id);
+      if (!c) continue;
+      this.pushBlockSolid(tris, c);
+      this.pushBlockWire(wire, c);
+    }
+    const group = new THREE.Group();
+    if (tris.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
+      g.computeVertexNormals();
+      group.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x8affc0, transparent: true, opacity: 0.85, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })));
+    }
+    if (wire.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
+      group.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
+    }
+    this.scene.add(group);
+    this.pathAnim = { group, t: 0 };
+  }
+
+  private stepPathAnim(dt: number): void {
+    const a = this.pathAnim!;
+    a.t += dt;
+    if (a.t < 0.6) {
+      a.group.visible = true; // highlight
+    } else if (a.t < 1.7) {
+      a.group.visible = Math.floor((a.t - 0.6) * 7) % 2 === 0; // flash on/off
+    } else {
+      this.scene.remove(a.group);
+      for (const child of a.group.children) {
+        const c = child as THREE.Mesh | THREE.LineSegments;
+        c.geometry.dispose();
+        (c.material as THREE.Material).dispose();
+      }
+      this.pathAnim = null;
+      this.clearGroup();
+      this.buildTerrain(); // opening cells are now low 'path'
+      this.path2Points = this.board!.path2!.map((id) => {
+        const w = toWorld(this.board!.cells.get(id)!.center);
+        return new THREE.Vector3(w[0], 0, w[2]);
+      });
+      this.path2Open = true;
+    }
   }
 
   clearUnits(): void {
@@ -885,6 +960,7 @@ export class BoardView {
       const dt = Math.min(0.05, now - this.lastT);
       this.lastT = now;
       const elapsed = now - this.clockStart;
+      if (this.pathAnim) this.stepPathAnim(dt);
       this.stepAura();
       for (const u of this.units) u.update(dt, elapsed);
       if (this.baseHeart) this.baseHeart.update(dt, elapsed);
