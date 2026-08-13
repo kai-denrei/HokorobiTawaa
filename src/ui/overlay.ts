@@ -7,20 +7,31 @@ import rulesRaw from '../../RULES.md?raw';
 import { renderMarkdown } from './markdown';
 import { BUILD } from '../version';
 
-export type PaletteItem = { key: string; label: string; role: string };
+export type PaletteItem = { key: string; label: string; role: string; cost?: number; affordable?: boolean };
 
 export type HudData = {
   lives: number;
+  gold: number;
+  mult: number;
   wave: number;
   totalWaves: number;
   message: string;
   status: string;
 };
 
+export type TowerMenuInfo = {
+  label: string;
+  tier: number;
+  nextCost: number | null;
+  sellValue: number;
+  canAffordUpgrade: boolean;
+};
+
 export type Overlay = {
   setCellInfo: (text: string) => void;
   setSeedInfo: (text: string) => void;
   openPalette: (title: string, items: PaletteItem[], onPick: (key: string) => void) => void;
+  openTowerMenu: (info: TowerMenuInfo, on: { onUpgrade: () => void; onSell: () => void }) => void;
   closePalette: () => void;
   setHud: (data: HudData) => void;
   showResult: (won: boolean) => void;
@@ -133,13 +144,47 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     sheetGrid.innerHTML = '';
     for (const it of items) {
       const b = el('button', 'hk-unit');
-      b.innerHTML = `<span class="hk-unit-label">${it.label}</span><span class="hk-unit-role">${it.role}</span>`;
+      const locked = it.affordable === false;
+      if (locked) b.classList.add('is-locked');
+      const cost = it.cost != null ? ` <span class="hk-unit-cost">◆${it.cost}</span>` : '';
+      b.innerHTML = `<span class="hk-unit-label">${it.label}${cost}</span><span class="hk-unit-role">${it.role}</span>`;
       b.addEventListener('click', () => {
+        if (locked) return;
         onPick(it.key);
         closePalette();
       });
       sheetGrid.append(b);
     }
+    sheet.classList.add('is-open');
+  };
+
+  const openTowerMenu = (info: TowerMenuInfo, on: { onUpgrade: () => void; onSell: () => void }): void => {
+    sheetTitle.textContent = `${info.label} · Tier ${info.tier}`;
+    sheetGrid.innerHTML = '';
+
+    const up = el('button', 'hk-unit');
+    if (info.nextCost == null) {
+      up.classList.add('is-locked');
+      up.innerHTML = '<span class="hk-unit-label">Max tier</span><span class="hk-unit-role">fully upgraded</span>';
+    } else {
+      const locked = !info.canAffordUpgrade;
+      if (locked) up.classList.add('is-locked');
+      up.innerHTML = `<span class="hk-unit-label">Upgrade <span class="hk-unit-cost">◆${info.nextCost}</span></span><span class="hk-unit-role">+damage · range · rate</span>`;
+      up.addEventListener('click', () => {
+        if (locked) return;
+        on.onUpgrade();
+      });
+    }
+    sheetGrid.append(up);
+
+    const sell = el('button', 'hk-unit');
+    sell.innerHTML = `<span class="hk-unit-label">Sell <span class="hk-unit-cost">+◆${info.sellValue}</span></span><span class="hk-unit-role">remove tower</span>`;
+    sell.addEventListener('click', () => {
+      on.onSell();
+      closePalette();
+    });
+    sheetGrid.append(sell);
+
     sheet.classList.add('is-open');
   };
 
@@ -178,12 +223,15 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
       seedInfo.textContent = text;
     },
     openPalette,
+    openTowerMenu,
     closePalette,
     setHud: (data) => {
       const low = data.lives <= 3 ? ' hk-lives-low' : '';
       hud.innerHTML =
         `<span class="hk-lives${low}">♥ ${data.lives}</span>` +
-        `<span class="hk-wave">WAVE ${data.wave}/${data.totalWaves}</span>` +
+        `<span class="hk-gold">◆ ${data.gold}</span>` +
+        `<span class="hk-mult">×${data.mult.toFixed(1)}</span>` +
+        `<span class="hk-wave">W ${data.wave}/${data.totalWaves}</span>` +
         `<span class="hk-msg">${data.message}</span>`;
     },
     showResult: (won) => {

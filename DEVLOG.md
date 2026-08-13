@@ -2,6 +2,20 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-13 — Economy + damage scaling
+
+- Gold economy (geoDefense model): start 120, income from kills only, bounty ×
+  kill-streak multiplier (`min(5, 1+0.05×streak)`, resets on any leak). HUD shows
+  gold + live ×multiplier.
+- Towers cost gold; palette shows costs and greys out unaffordable ones. Tap a
+  placed tower → Upgrade/Sell sheet: 2 tiers (0.7×/1.2× place cost) boosting
+  damage/range/rate (+ a tier-2 signature per attack type); sell refunds 75% of
+  total spent. Combat now uses per-tower effective stats; towers grow per tier.
+- Re-tuned enemy HP/bounty + per-wave HP scaler [1.0…1.75]; redesigned the 6
+  waves (spikes + boss). Design spec: docs/superpowers/specs/2026-08-13-economy-scaling-design.md.
+- Verified: buy 120→80, upgrade →52, sell →103 (75% refund), kill income raised
+  gold + multiplier, unaffordable towers locked. 0 errors.
+
 ## 2026-08-12 — Published
 
 - Live: **https://kai-denrei.github.io/HokorobiTawaa/** (GitHub Pages, auto-deploy

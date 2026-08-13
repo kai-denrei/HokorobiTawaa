@@ -5,9 +5,6 @@ import { generateBoard, type Board } from './board';
 import { TOWERS, ENEMIES } from './units/roster';
 import { Game } from './game/game';
 
-const toItems = (defs: typeof TOWERS): PaletteItem[] =>
-  defs.map((d) => ({ key: d.key, label: d.label, role: d.role }));
-
 const canvas = document.getElementById('board-canvas') as HTMLCanvasElement;
 const app = document.getElementById('app') as HTMLElement;
 
@@ -43,6 +40,61 @@ view.onTick = (dt) => {
 view.onLeak = () => {
   if (mode === 'play') game.leak();
 };
+view.onKill = (e) => {
+  if (mode === 'play') game.onKill(e);
+};
+
+function toBuyItems(): PaletteItem[] {
+  return TOWERS.map((d) => ({
+    key: d.key,
+    label: d.label,
+    role: d.role,
+    cost: d.cost,
+    affordable: game.canAfford(d.cost ?? 0),
+  }));
+}
+
+function openBuy(cellId: number): void {
+  overlay.openPalette(`Place tower · ◆${game.goldNow}`, toBuyItems(), (key) => {
+    const def = TOWERS.find((t) => t.key === key)!;
+    const cost = def.cost ?? 0;
+    if (game.spend(cost)) {
+      view.spawnTower(cellId, key, cost);
+      overlay.setCellInfo(`placed ${def.label}`);
+    } else {
+      overlay.setCellInfo('not enough gold');
+    }
+  });
+}
+
+function openTowerMenuFor(cellId: number): void {
+  const info = view.towerInfo(cellId);
+  if (!info) return;
+  overlay.openTowerMenu(
+    {
+      label: info.label,
+      tier: info.tier,
+      nextCost: info.nextCost,
+      sellValue: info.sellValue,
+      canAffordUpgrade: info.nextCost != null && game.canAfford(info.nextCost),
+    },
+    {
+      onUpgrade: () => {
+        const inf = view.towerInfo(cellId);
+        if (inf && inf.nextCost != null && game.spend(inf.nextCost)) {
+          view.upgradeTower(cellId, inf.nextCost);
+          openTowerMenuFor(cellId); // refresh with new tier/costs
+        }
+      },
+      onSell: () => {
+        const inf = view.towerInfo(cellId);
+        view.sellTower(cellId);
+        game.addGold(inf ? inf.sellValue : 0);
+        overlay.setCellInfo('tower sold');
+      },
+    },
+  );
+}
 
 function setSeedInfo(): void {
   overlay.setSeedInfo(`seed ${seed} · ${board.cells.size} cells · path ${board.path.length}`);
@@ -147,17 +199,10 @@ canvas.addEventListener('pointerup', (e) => {
   }
   const c = hit.cell;
   if (c.terrain === 'buildable') {
-    overlay.openPalette(`Place tower · cell #${c.id}`, toItems(TOWERS), (key) => {
-      const label = view.spawnTower(c.id, key);
-      overlay.setCellInfo(`placed ${label ?? key} on #${c.id} · ${view.unitCount} units`);
-    });
-  } else if (c.terrain === 'path' || c.terrain === 'spawn' || c.terrain === 'base') {
-    overlay.openPalette('Spawn enemy (walks the path)', toItems(ENEMIES), (key) => {
-      const label = view.spawnEnemy(key);
-      overlay.setCellInfo(`spawned ${label ?? key} · ${view.unitCount} units`);
-    });
+    if (view.hasTower(c.id)) openTowerMenuFor(c.id);
+    else openBuy(c.id);
   } else {
-    overlay.setCellInfo(`cell #${c.id} · ${c.terrain} · ${c.neighbors.length} neighbours`);
+    overlay.setCellInfo(`cell #${c.id} · ${c.terrain}`);
     overlay.closePalette();
   }
 });

@@ -242,18 +242,24 @@ html, body {
   left: 0; right: 0;
   z-index: 9;
   display: flex;
-  gap: 16px;
+  gap: 10px;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   pointer-events: none;
   font-size: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-shadow: 0 0 8px rgba(53,255,122,0.5);
 }
 .hk-lives { color: #5affd0; }
 .hk-lives-low { color: #ff6a6a; text-shadow: 0 0 10px rgba(255,80,80,0.7); }
+.hk-gold { color: #ffd24a; text-shadow: 0 0 8px rgba(255,210,74,0.5); }
+.hk-mult { color: #5affd0; opacity: 0.85; }
 .hk-wave { color: var(--hk-green); opacity: 0.9; }
-.hk-msg { color: var(--hk-green); opacity: 0.6; }
+.hk-msg { color: var(--hk-green); opacity: 0.55; }
+.hk-unit-cost { color: #ffd24a; }
+.hk-unit.is-locked { opacity: 0.4; cursor: not-allowed; }
+.hk-unit.is-locked:hover { border-color: var(--hk-green-dim); box-shadow: none; }
 
 /* ---- win / lose result screen ---- */
 .hk-result {

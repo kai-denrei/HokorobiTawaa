@@ -12,7 +12,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import type { Board, Cell, Vec2 } from '../board';
 import { THEME, BLOOM } from './theme';
 import { Unit, Enemy, dotTexture } from '../units/unit';
-import { UNIT_BY_KEY } from '../units/roster';
+import { UNIT_BY_KEY, upgradeCost, REFUND_FRACTION } from '../units/roster';
 
 export type MountainStyle = 'wire' | 'solid';
 
@@ -76,6 +76,7 @@ export class BoardView {
   private unitsGroup = new THREE.Group();
   private units: Unit[] = [];
   private towers: Unit[] = [];
+  private towerByCell = new Map<number, Unit>();
   private enemies: Enemy[] = [];
   private effectsGroup = new THREE.Group();
   private effects: { line: THREE.Line; mat: THREE.LineBasicMaterial; ttl: number; max: number }[] = [];
@@ -90,7 +91,7 @@ export class BoardView {
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
-  onKill: (() => void) | null = null;
+  onKill: ((e: Enemy) => void) | null = null;
   private clockStart = 0;
   private lastT = 0;
   private raycaster = new THREE.Raycaster();
@@ -271,23 +272,61 @@ export class BoardView {
     if (this.board) this.setBoard(this.board);
   }
 
-  /** Place a tower (static dotted unit) on a cell. Returns its role label or null. */
-  spawnTower(cellId: number, key: string): string | null {
+  /** Place a tower (static dotted unit) on a cell. `cost` is recorded for refund. */
+  spawnTower(cellId: number, key: string, cost = 0): string | null {
     if (!this.board) return null;
     const cell = this.board.cells.get(cellId);
     const def = UNIT_BY_KEY[key];
     if (!cell || !def || def.family !== 'tower') return null;
+    if (this.towerByCell.has(cellId)) return null; // one tower per cell
     const u = new Unit(def, this.towerScale, this.units.length);
+    u.spent = cost;
     const w = toWorld(cell.center);
     u.placeAt(w[0], w[2], WALL_HEIGHT); // on top of the raised buildable platform
     this.unitsGroup.add(u.object);
     this.units.push(u);
     this.towers.push(u);
+    this.towerByCell.set(cellId, u);
     return def.label;
   }
 
+  hasTower(cellId: number): boolean {
+    return this.towerByCell.has(cellId);
+  }
+
+  /** Upgrade/sell info for the tower on a cell, or null if none. */
+  towerInfo(cellId: number): { label: string; tier: number; nextCost: number | null; sellValue: number } | null {
+    const t = this.towerByCell.get(cellId);
+    if (!t) return null;
+    return {
+      label: t.def.label,
+      tier: t.tier,
+      nextCost: upgradeCost(t.def, t.tier),
+      sellValue: Math.round(t.spent * REFUND_FRACTION),
+    };
+  }
+
+  upgradeTower(cellId: number, addedCost: number): boolean {
+    const t = this.towerByCell.get(cellId);
+    if (!t || upgradeCost(t.def, t.tier) == null) return false;
+    t.upgrade(addedCost);
+    return true;
+  }
+
+  /** Remove the tower on a cell; returns total gold spent on it (for refund). */
+  sellTower(cellId: number): number {
+    const t = this.towerByCell.get(cellId);
+    if (!t) return 0;
+    this.unitsGroup.remove(t.object);
+    t.dispose();
+    this.towers = this.towers.filter((x) => x !== t);
+    this.units = this.units.filter((x) => x !== t);
+    this.towerByCell.delete(cellId);
+    return t.spent;
+  }
+
   /** Spawn an enemy that walks the board path from spawn to base, looping. */
-  spawnEnemy(key: string): string | null {
+  spawnEnemy(key: string, hpScale = 1): string | null {
     if (!this.board) return null;
     const def = UNIT_BY_KEY[key];
     if (!def || def.family !== 'enemy') return null;
@@ -296,7 +335,7 @@ export class BoardView {
       return new THREE.Vector3(w[0], 0, w[2]);
     });
     if (pts.length < 2) return null;
-    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.13);
+    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.13, 0, hpScale);
     this.unitsGroup.add(e.object);
     this.units.push(e);
     this.enemies.push(e);
@@ -310,6 +349,7 @@ export class BoardView {
     }
     this.units = [];
     this.towers = [];
+    this.towerByCell.clear();
     this.enemies = [];
     for (const e of this.effects) {
       this.effectsGroup.remove(e.line);
@@ -335,9 +375,9 @@ export class BoardView {
     for (const t of this.towers) {
       t.cooldown -= dt;
       if (t.cooldown > 0) continue;
-      const range = t.def.range ?? 0;
-      const dmg = t.def.damage ?? 0;
-      const rate = t.def.fireRate ?? 0;
+      const range = t.effRange;
+      const dmg = t.effDamage;
+      const rate = t.effFireRate;
       if (range <= 0 || dmg <= 0 || rate <= 0) continue;
       const tp = t.object.position;
       let best: Enemy | null = null;
@@ -360,9 +400,9 @@ export class BoardView {
           best.damage(dmg); // instant hitscan
           this.spawnBolt(tp, target);
         } else if (atk === 'mortar') {
-          this.fireMortar(tp, target, dmg, t.def.splash ?? 0.06, color);
+          this.fireMortar(tp, target, dmg, t.effSplash || 0.06, color);
         } else if (atk === 'spread') {
-          this.fireSpread(tp, target, dmg, t.def.projSpeed ?? 0.7, t.def.pellets ?? 5, color);
+          this.fireSpread(tp, target, dmg, t.def.projSpeed ?? 0.7, t.effPellets || 5, color);
         } else if (atk === 'homing') {
           this.fireHoming(tp, best, dmg, t.def.projSpeed ?? 0.6, color);
         } else {
@@ -483,7 +523,7 @@ export class BoardView {
       this.unitsGroup.remove(e.object);
       e.dispose();
       if (e.reachedEnd) this.onLeak?.();
-      else this.onKill?.();
+      else this.onKill?.(e);
     }
     this.enemies = this.enemies.filter((e) => !rem.has(e));
     this.units = this.units.filter((u) => !rem.has(u as Enemy));

@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { SHAPES } from './shapes';
 import type { UnitDef } from './roster';
+import { UP_DAMAGE, UP_RANGE, UP_RATE } from './roster';
 
 let dotTex: THREE.Texture | null = null;
 export function dotTexture(): THREE.Texture {
@@ -65,10 +66,23 @@ export class Unit {
   protected baseY = 0;
   /** Seconds until this tower can fire again (combat state). */
   cooldown = 0;
+  /** Tower economy/upgrade state + effective (post-upgrade) combat stats. */
+  tier = 0;
+  spent = 0;
+  effRange: number;
+  effDamage: number;
+  effFireRate: number;
+  effSplash: number;
+  effPellets: number;
 
   constructor(readonly def: UnitDef, scale: number, seedIndex: number) {
     const shape = SHAPES[def.key]!;
     this.count = shape.count;
+    this.effRange = def.range ?? 0;
+    this.effDamage = def.damage ?? 0;
+    this.effFireRate = def.fireRate ?? 0;
+    this.effSplash = def.splash ?? 0;
+    this.effPellets = def.pellets ?? 0;
     const baked = bakeRotX(shape.positions, def.rotX ?? 0);
     shuffleTriples(baked);
     this.geo = new THREE.BufferGeometry();
@@ -116,6 +130,26 @@ export class Unit {
     }
   }
 
+  /** Apply one upgrade tier: boost effective stats + a tier-2 signature bump. */
+  upgrade(addedCost: number): void {
+    this.tier++;
+    this.spent += addedCost;
+    this.effDamage *= 1 + UP_DAMAGE;
+    this.effRange *= 1 + UP_RANGE;
+    this.effFireRate *= 1 + UP_RATE;
+    if (this.tier === 2) {
+      switch (this.def.attack) {
+        case 'mortar': this.effSplash *= 1.4; break;
+        case 'spread': this.effPellets += 2; break;
+        case 'beam':
+        case 'homing': this.effRange *= 1.3; break;
+        case 'single': this.effFireRate *= 1.2; break;
+        default: break;
+      }
+    }
+    this.object.scale.setScalar(this.baseScale * (1 + 0.12 * this.tier)); // grow per tier
+  }
+
   /** Show only `frac` of the (pre-shuffled) dots — HP rendered as dot density. */
   setDensity(frac: number): void {
     const n = Math.max(3, Math.floor(this.count * Math.max(0, Math.min(1, frac))));
@@ -157,9 +191,10 @@ export class Enemy extends Unit {
     private readonly path: THREE.Vector3[],
     private readonly speed: number,
     startDist = 0,
+    hpScale = 1,
   ) {
     super(def, scale, seedIndex);
-    this.maxHp = def.hp ?? 50;
+    this.maxHp = (def.hp ?? 50) * hpScale;
     this.hp = this.maxHp;
     for (let i = 1; i < path.length; i++) {
       this.cum[i] = this.cum[i - 1]! + path[i]!.distanceTo(path[i - 1]!);
@@ -182,6 +217,10 @@ export class Enemy extends Unit {
 
   worldPos(): THREE.Vector3 {
     return this.object.position;
+  }
+
+  get bounty(): number {
+    return this.def.bounty ?? 0;
   }
 
   override update(dt: number, elapsed: number): void {
