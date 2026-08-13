@@ -84,7 +84,7 @@ const T_PALE = 0xc4e6ff;
 const T_LASER = 0x9ff5ff;
 
 export const TOWERS: UnitDef[] = [
-  { key: 'tree', label: 'Single Shot', role: 'Basic · single shot', family: 'tower', color: T_WHITE, idle: 'none', range: 0.17, fireRate: 1.4, damage: 14, attack: 'single', projSpeed: 0.9, cost: 40, projColor: T_WHITE, projSize: 0.022, projTrail: 0 },
+  { key: 'tree', shape: 'turret', label: 'Single Shot', role: 'Basic · single shot', family: 'tower', color: T_WHITE, idle: 'none', range: 0.17, fireRate: 1.4, damage: 14, attack: 'single', projSpeed: 0.9, cost: 40, projColor: T_WHITE, projSize: 0.022, projTrail: 0 },
   { key: 'gear', label: 'AoE', role: 'Mortar · splash', family: 'tower', color: T_ICE, rotX: -Math.PI / 2, spin: 0.7, idle: 'spin', range: 0.16, fireRate: 0.9, damage: 12, attack: 'mortar', splash: 0.07, cost: 110, projColor: T_ICE, projSize: 0.05 },
   { key: 'spiral', label: 'Rapid', role: 'Rapid single-target', family: 'tower', color: T_CYAN, spin: 0.5, idle: 'spin', range: 0.16, fireRate: 3.0, damage: 7, attack: 'single', projSpeed: 1.2, cost: 70, projColor: T_CYAN, projSize: 0.016, projTrail: 3 },
   { key: 'dspiral', label: 'Homing', role: 'Homing bolts', family: 'tower', color: T_AZURE, idle: 'none', range: 0.16, fireRate: 1.2, damage: 9, attack: 'homing', projSpeed: 0.6, cost: 90, projColor: T_AZURE, projSize: 0.024, projTrail: 6 },
