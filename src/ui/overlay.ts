@@ -6,6 +6,7 @@ import devlogRaw from '../../DEVLOG.md?raw';
 import rulesRaw from '../../RULES.md?raw';
 import { renderMarkdown } from './markdown';
 import { BUILD } from '../version';
+import { versionGlyphsHTML, applyGlyphFavicon } from '../version-glyph';
 
 export type PaletteItem = { key: string; label: string; role: string; cost?: number; affordable?: boolean };
 
@@ -76,7 +77,8 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const title = el('div', 'hk-title');
   title.innerHTML = '<span class="hk-kanji">綻</span> HokorobiTawaa <span class="hk-kanji">塔</span>';
   const badge = el('button', 'hk-badge');
-  badge.innerHTML = `<span class="hk-badge-dot"></span>v${BUILD.version}<span class="hk-badge-token">${BUILD.token}</span>`;
+  badge.innerHTML = `${versionGlyphsHTML(BUILD.token)}v${BUILD.version}<span class="hk-badge-token">${BUILD.token}</span>`;
+  applyGlyphFavicon(BUILD.token); // tab icon = the build's glyph (cache-bust check)
   badge.title = 'Build version — open Dev Log & Rules';
   top.append(title, badge);
 

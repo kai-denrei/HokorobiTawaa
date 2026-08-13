@@ -282,6 +282,15 @@ canvas.addEventListener('pointerup', (e) => {
 // --- PWA service worker ---------------------------------------------------
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    // reload once when a NEW build's SW takes control (cache-bust applied),
+    // but not on the very first install (no prior controller).
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing || !hadController) return;
+      refreshing = true;
+      location.reload();
+    });
     navigator.serviceWorker.register('./sw.js').catch(() => {
       /* offline support is best-effort */
     });

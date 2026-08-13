@@ -24,6 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run bump # fresh build token → new SW cache name → old caches purged
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

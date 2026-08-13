@@ -1,7 +1,7 @@
 // sw.js — minimal offline app-shell service worker.
 // CACHE_VERSION is bumped by scripts/bump-version.mjs on each build so a new
 // build invalidates the old cache (works with the cache-busting layer).
-const CACHE_VERSION = 'hk-20260812115017';
+const CACHE_VERSION = 'hk-20260814000041';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {

@@ -2,6 +2,20 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-14 — Cache-busting fixed + version glyphs
+
+- Root cause of stale builds (old towers on the live site): the build token was
+  frozen because CI never ran the bump, so the service-worker cache name never
+  changed and old caches were never purged. Fix: CI now runs `npm run bump`
+  before the build, so every deploy gets a fresh token → new SW cache name →
+  `activate` deletes the old cache.
+- SW auto-reload: the page reloads once when a new build's SW takes control
+  (controllerchange), so updates apply without a manual hard-refresh.
+- Version glyphs (cache-busting skill): the token is hashed to bytes → cells in
+  an 8-colour × 8-shape grid; three tiles show in the version badge and the
+  leading cell becomes the tab favicon. Glyphs change every build, so you can
+  confirm the bust visually (same glyphs after deploy = still cached upstream).
+
 ## 2026-08-13 — Second path + fixes
 
 - Radial affordability now updates live: gaining gold while a menu is open

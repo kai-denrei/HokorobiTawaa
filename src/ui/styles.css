@@ -76,6 +76,8 @@ html, body {
   background: var(--hk-green);
   box-shadow: 0 0 8px var(--hk-green);
 }
+.hk-badge-glyphs { display: inline-flex; gap: 3px; align-items: center; }
+.hk-badge-glyphs svg { width: 13px; height: 13px; display: block; border-radius: 3px; }
 .hk-badge-token {
   opacity: 0.6;
   padding-left: 6px;

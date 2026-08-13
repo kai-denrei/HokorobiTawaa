@@ -4,6 +4,6 @@
 // (the human-visible half of cache-busting).
 export const BUILD = {
   version: '0.1.0',
-  token: '20260812115017',
-  builtAt: '2026-08-12T02:50:17.886Z',
+  token: '20260814000041',
+  builtAt: '2026-08-13T15:00:41.540Z',
 } as const;
