@@ -41,6 +41,10 @@ function bakeRotX(src: Float32Array, rot: number): Float32Array {
   return out;
 }
 
+function hexToRgb(h: number): [number, number, number] {
+  return [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
+}
+
 /** Fisher–Yates over point triples so truncating the draw range thins the cloud
  * uniformly (HP-as-density) rather than eroding one structured region. */
 function shuffleTriples(a: Float32Array): void {
@@ -63,6 +67,9 @@ export class Unit {
   protected readonly restY: number;
   protected readonly phase: number;
   protected readonly count: number;
+  protected baseArr!: Float32Array; // static base positions (unit space)
+  protected workArr!: Float32Array; // geometry buffer (may be animated)
+  protected perPoint = false; // wave/twist rewrite geometry each frame
   protected baseY = 0;
   /** Seconds until this tower can fire again (combat state). */
   cooldown = 0;
@@ -76,20 +83,38 @@ export class Unit {
   effPellets: number;
 
   constructor(readonly def: UnitDef, scale: number, seedIndex: number) {
-    const shape = SHAPES[def.key]!;
+    const shape = SHAPES[def.shape ?? def.key]!;
     this.count = shape.count;
     this.effRange = def.range ?? 0;
     this.effDamage = def.damage ?? 0;
     this.effFireRate = def.fireRate ?? 0;
     this.effSplash = def.splash ?? 0;
     this.effPellets = def.pellets ?? 0;
+    this.perPoint = def.idle === 'wave' || def.idle === 'twist';
+
     const baked = bakeRotX(shape.positions, def.rotX ?? 0);
     shuffleTriples(baked);
+    this.baseArr = baked;
+    this.workArr = baked.slice();
     this.geo = new THREE.BufferGeometry();
-    this.geo.setAttribute('position', new THREE.BufferAttribute(baked, 3));
+    this.geo.setAttribute('position', new THREE.BufferAttribute(this.workArr, 3).setUsage(this.perPoint ? THREE.DynamicDrawUsage : THREE.StaticDrawUsage));
+
+    // per-vertex colours (supports dual-code via def.color2)
+    const col = new Float32Array(this.count * 3);
+    const c1 = hexToRgb(def.color);
+    const c2 = def.color2 != null ? hexToRgb(def.color2) : null;
+    for (let i = 0; i < this.count; i++) {
+      const c = c2 && i % 3 === 0 ? c2 : c1;
+      col[i * 3] = c[0];
+      col[i * 3 + 1] = c[1];
+      col[i * 3 + 2] = c[2];
+    }
+    this.geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+    this.baseScale = scale * (def.sizeScale ?? 1);
     this.mat = new THREE.PointsMaterial({
-      color: def.color,
-      size: scale * 0.14,
+      vertexColors: true,
+      size: this.baseScale * 0.14,
       map: dotTexture(),
       transparent: true,
       alphaTest: 0.18,
@@ -98,10 +123,9 @@ export class Unit {
       blending: THREE.AdditiveBlending,
     });
     this.object = new THREE.Points(this.geo, this.mat);
-    this.baseScale = scale;
-    this.restY = scale;
+    this.restY = this.baseScale;
     this.phase = seedIndex * 1.7;
-    this.object.scale.setScalar(scale);
+    this.object.scale.setScalar(this.baseScale);
   }
 
   /** Bob offset above the rest height (ghost/flyer). */
@@ -125,9 +149,51 @@ export class Unit {
         o.scale.set(this.baseScale * (0.85 + 0.15 * Math.cos(elapsed * 5)), this.baseScale, this.baseScale);
         break;
       }
+      case 'jelly': {
+        const sy = 1 + 0.24 * Math.sin(elapsed * 3 + this.phase);
+        const sx = 1 / Math.sqrt(sy);
+        o.scale.set(this.baseScale * sx, this.baseScale * sy, this.baseScale * sx);
+        break;
+      }
       default:
         break;
     }
+  }
+
+  /** wave/twist rewrite the geometry buffer from the static base each frame. */
+  private animatePerPoint(elapsed: number): void {
+    const b = this.baseArr;
+    const w = this.workArr;
+    if (this.def.idle === 'wave') {
+      for (let i = 0; i < b.length; i += 3) {
+        const x = b[i]!;
+        const y = b[i + 1]!;
+        const z = b[i + 2]!;
+        const d = 1 + 0.14 * Math.sin(3 * Math.atan2(z, x) + elapsed * 3 - y * 2);
+        w[i] = x * d;
+        w[i + 1] = y;
+        w[i + 2] = z * d;
+      }
+    } else {
+      // twist: rotate each point about Y by an angle rising with height
+      for (let i = 0; i < b.length; i += 3) {
+        const x = b[i]!;
+        const y = b[i + 1]!;
+        const z = b[i + 2]!;
+        const a = elapsed * 0.4 + y * 1.6 * Math.sin(elapsed * 0.7);
+        const c = Math.cos(a);
+        const s = Math.sin(a);
+        w[i] = x * c + z * s;
+        w[i + 1] = y;
+        w[i + 2] = -x * s + z * c;
+      }
+    }
+    (this.geo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  protected animateIdle(elapsed: number): void {
+    if (this.perPoint) this.animatePerPoint(elapsed);
+    else this.pose(elapsed);
   }
 
   /** Apply one upgrade tier: boost effective stats + a tier-2 signature bump. */
@@ -163,7 +229,7 @@ export class Unit {
   }
 
   update(_dt: number, elapsed: number): void {
-    this.pose(elapsed);
+    this.animateIdle(elapsed);
     this.object.position.y = this.baseY + this.restY + this.bob(elapsed);
   }
 
@@ -185,6 +251,14 @@ export class Enemy extends Unit {
   reachedEnd = false;
   private slowTimer = 0;
   private slowFactor = 1;
+  private hitTimer = 99; // seconds since last hit (for heal-out-of-combat)
+  private behMult = 1; // brief accel/slow-on-hit multiplier
+  private behTimer = 0;
+  private errTimer = 0;
+  private errTarget = 1;
+  private errMult = 1;
+  /** External aura speed multiplier, set by the scene each frame. */
+  auraMult = 1;
 
   constructor(
     def: UnitDef,
@@ -205,9 +279,18 @@ export class Enemy extends Unit {
     this.dist = ((startDist % this.total) + this.total) % this.total;
   }
 
-  /** Apply damage; die at 0 HP, otherwise thin the dot cloud to show damage. */
+  /** Apply damage; die at 0 HP, otherwise thin the dot cloud to show damage.
+   * Also drives the on-hit behaviours (accelerate / slow / reset heal timer). */
   damage(d: number): void {
     if (!this.alive) return;
+    this.hitTimer = 0;
+    if (this.def.accelOnHit) {
+      this.behMult = this.def.accelOnHit;
+      this.behTimer = 1.2;
+    } else if (this.def.slowOnHitSelf) {
+      this.behMult = this.def.slowOnHitSelf;
+      this.behTimer = 1.2;
+    }
     this.hp -= d;
     if (this.hp <= 0) {
       this.hp = 0;
@@ -238,11 +321,29 @@ export class Enemy extends Unit {
 
   override update(dt: number, elapsed: number): void {
     if (this.reachedEnd) {
-      this.pose(elapsed);
+      this.animateIdle(elapsed);
       return;
     }
+    this.hitTimer += dt;
+    if (this.behTimer > 0) {
+      this.behTimer -= dt;
+      if (this.behTimer <= 0) this.behMult = 1;
+    }
+    if (this.def.healOOC && this.hitTimer > 1.2 && this.hp < this.maxHp) {
+      this.hp = Math.min(this.maxHp, this.hp + this.def.healOOC * dt);
+      this.setDensity(this.hp / this.maxHp);
+    }
+    if (this.def.erratic) {
+      this.errTimer -= dt;
+      if (this.errTimer <= 0) {
+        this.errTarget = 0.4 + Math.random() * 1.4;
+        this.errTimer = 0.6 + Math.random() * 0.9;
+      }
+      this.errMult += (this.errTarget - this.errMult) * Math.min(1, 3 * dt);
+    }
     this.slowTimer = Math.max(0, this.slowTimer - dt);
-    const spd = this.slowTimer > 0 ? this.speed * this.slowFactor : this.speed;
+    const towerSlow = this.slowTimer > 0 ? this.slowFactor : 1;
+    const spd = this.speed * towerSlow * this.behMult * (this.def.erratic ? this.errMult : 1) * this.auraMult;
     this.dist += spd * dt;
     if (this.dist >= this.total) {
       this.dist = this.total;
@@ -255,7 +356,7 @@ export class Enemy extends Unit {
     const b = this.path[seg + 1] ?? a;
     const segLen = (this.cum[seg + 1] ?? this.total) - this.cum[seg]!;
     const f = segLen > 1e-6 ? (this.dist - this.cum[seg]!) / segLen : 0;
-    this.pose(elapsed);
+    this.animateIdle(elapsed);
     this.object.position.set(
       a.x + (b.x - a.x) * f,
       this.baseY + this.restY + this.bob(elapsed),

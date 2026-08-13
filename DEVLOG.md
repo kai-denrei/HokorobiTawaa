@@ -2,6 +2,22 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-13 — Enemy overhaul: bestiary, behaviours, colour schema
+
+- Towers renamed to functions (Single Shot, AoE, Rapid, Homing, Sniper, Spread,
+  Slow, Laser) and cool-shifted (white/cyan/ice/teal/azure) so enemies own the
+  warm threat hues.
+- Colour schema: hue = class (yellow=fast, green=heal, blue=aura, red=danger,
+  orange=epic, purple=epic-rare), brightness = rank, size + dot-count = tier/HP
+  (density still tracks live HP). Dual-code via a sprinkled secondary tint
+  (vertex colours) — e.g. Drifter yellow+blue, Prime purple+pink.
+- New shapes: Slime, Sea Mine (spiked), UFO (saucer). New animations: Wave &
+  Twist (per-point geometry rewrite) + Jelly (squash/stretch).
+- 12-enemy roster (agile→normal→tanky→epic→boss) with behaviours: erratic
+  (RNG speed bursts), accelerate-when-hit, slow-when-hit, heal-when-not-hit,
+  and a Blue-aura that speed-boosts nearby enemies (scene proximity pass).
+- Reworked to 8 waves introducing the behaviours in turn.
+
 ## 2026-08-13 — Radial menu, range viz, role colours, Pyramid slow tower
 
 - **Radial menu**: tapping a buildable cell opens a ring of options at the tap

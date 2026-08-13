@@ -31,23 +31,20 @@ const START_LIVES = 15;
 const START_DELAY = 8; // seconds before wave 1 (place your towers)
 const BETWEEN_DELAY = 6; // seconds between waves
 
-/** Per-wave HP multiplier (waves 1–6), applied to base enemy HP. */
-const HP_SCALE = [1.0, 1.12, 1.25, 1.4, 1.55, 1.75];
+/** Per-wave HP multiplier, applied to base enemy HP. */
+const HP_SCALE = [1.0, 1.1, 1.2, 1.32, 1.44, 1.56, 1.7, 1.9];
 
-/** Escalating waves; two deliberate "spike" waves force tower-type diversity. */
+/** Escalating waves that introduce the new behaviours in turn. */
 function buildWaves(): Wave[] {
   return [
-    [{ key: 'butterfly', count: 10, interval: 0.55 }],
-    [{ key: 'butterfly', count: 10, interval: 0.5 }, { key: 'shell', count: 4, interval: 0.9 }],
-    [{ key: 'shell', count: 8, interval: 0.7 }, { key: 'cloud', count: 3, interval: 1.3 }], // spike: tanky
-    [{ key: 'butterfly', count: 14, interval: 0.4 }, { key: 'ghost', count: 6, interval: 0.8 }],
-    [{ key: 'knot', count: 3, interval: 1.6 }, { key: 'shell', count: 8, interval: 0.7 }], // spike: elites
-    [
-      { key: 'butterfly', count: 10, interval: 0.45 },
-      { key: 'cloud', count: 4, interval: 1.2 },
-      { key: 'ghost', count: 5, interval: 0.8 },
-      { key: 'knot', count: 3, interval: 1.7 },
-    ], // boss wave
+    [{ key: 'butterfly', count: 10, interval: 0.5 }], // agile intro
+    [{ key: 'butterfly', count: 8, interval: 0.45 }, { key: 'ghost', count: 5, interval: 0.7 }],
+    [{ key: 'scoutufo', count: 8, interval: 0.55 }, { key: 'gslime', count: 3, interval: 1.2 }], // healers arrive
+    [{ key: 'bslime', count: 2, interval: 1.4 }, { key: 'butterfly', count: 12, interval: 0.35 }, { key: 'drifter', count: 3, interval: 0.9 }], // aura + erratic
+    [{ key: 'shell', count: 6, interval: 0.7 }, { key: 'gslime', count: 4, interval: 1.0 }], // armored + healers
+    [{ key: 'barbed', count: 4, interval: 1.1 }, { key: 'scoutufo', count: 6, interval: 0.5 }], // accel-on-hit
+    [{ key: 'cloud', count: 3, interval: 1.3 }, { key: 'rolling', count: 2, interval: 1.8 }, { key: 'ghost', count: 6, interval: 0.6 }], // epic tanks
+    [{ key: 'knot', count: 2, interval: 1.9 }, { key: 'prime', count: 1, interval: 1 }, { key: 'barbed', count: 3, interval: 1.2 }, { key: 'bslime', count: 2, interval: 1.4 }], // boss
   ];
 }
 

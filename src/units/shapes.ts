@@ -356,6 +356,65 @@ function ghostPts(): P[] {
   return fitUnit(pts);
 }
 
+function slimePts(): P[] {
+  const pts: P[] = [];
+  const N = 440;
+  for (let i = 0; i < N; i++) {
+    const d = fibDir(i, N);
+    const wob = 1 + 0.12 * Math.sin(d[0]! * 5.5) * Math.sin(d[2]! * 5.5);
+    const y = (d[1]! < 0 ? d[1]! * 0.55 : d[1]! * 0.95) * 0.9; // flat-ish bottom, rounded top
+    pts.push([d[0]! * 1.05 * wob, y, d[2]! * 1.05 * wob]);
+  }
+  // two "eye" dimples left as-is; keep simple blob
+  return fitUnit(pts);
+}
+function seaminePts(): P[] {
+  const pts: P[] = [];
+  const N = 300;
+  for (let i = 0; i < N; i++) {
+    const d = fibDir(i, N);
+    pts.push([d[0]! * 0.6, d[1]! * 0.6, d[2]! * 0.6]); // core sphere
+  }
+  const S = 16;
+  for (let s = 0; s < S; s++) {
+    const d = fibDir(s, S); // spike direction
+    for (let t = 1; t <= 6; t++) {
+      const r = 0.6 + (t / 6) * 0.42;
+      pts.push([d[0]! * r, d[1]! * r, d[2]! * r]);
+    }
+  }
+  return fitUnit(pts);
+}
+function ufoPts(): P[] {
+  const pts: P[] = [];
+  const R = 1.0;
+  const cols = 34;
+  const rings = 7;
+  for (let ir = 1; ir <= rings; ir++) {
+    const r = (R * ir) / rings;
+    const yb = 0.18 * (1 - (r / R) * (r / R)); // lens profile
+    for (let a = 0; a < cols; a++) {
+      const ang = (a / cols) * 2 * Math.PI;
+      pts.push([r * Math.cos(ang), yb, r * Math.sin(ang)]);
+      pts.push([r * Math.cos(ang), -yb * 0.7, r * Math.sin(ang)]);
+    }
+  }
+  for (let a = 0; a < cols; a++) {
+    const ang = (a / cols) * 2 * Math.PI;
+    pts.push([R * Math.cos(ang), 0, R * Math.sin(ang)]); // rim
+  }
+  for (let i = 0; i < 90; i++) {
+    const d = fibDir(i, 90);
+    if (d[1]! < 0) continue;
+    pts.push([d[0]! * 0.4, 0.18 + d[1]! * 0.3, d[2]! * 0.4]); // cockpit dome
+  }
+  for (let a = 0; a < 10; a++) {
+    const ang = (a / 10) * 2 * Math.PI;
+    pts.push([0.7 * Math.cos(ang), -0.14, 0.7 * Math.sin(ang)]); // under-lights
+  }
+  return fitUnit(pts);
+}
+
 export type ShapeDef = {
   key: string;
   label: string;
@@ -387,4 +446,7 @@ export const SHAPES: Record<string, ShapeDef> = {
   shell: toShape('shell', 'Shell', shellPts()),
   cloud: toShape('cloud', 'Cloud', cloudPts()),
   ghost: toShape('ghost', 'Ghost', ghostPts()),
+  slime: toShape('slime', 'Slime', slimePts()),
+  seamine: toShape('seamine', 'Sea Mine', seaminePts()),
+  ufo: toShape('ufo', 'UFO', ufoPts()),
 };

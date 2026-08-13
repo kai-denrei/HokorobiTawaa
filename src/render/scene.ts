@@ -389,7 +389,7 @@ export class BoardView {
       return new THREE.Vector3(w[0], 0, w[2]);
     });
     if (pts.length < 2) return null;
-    const e = new Enemy(def, this.enemyScale, this.units.length, pts, 0.13, 0, hpScale);
+    const e = new Enemy(def, this.enemyScale, this.units.length, pts, def.speed ?? 0.12, 0, hpScale);
     this.unitsGroup.add(e.object);
     this.units.push(e);
     this.enemies.push(e);
@@ -468,6 +468,23 @@ export class BoardView {
 
   get enemyCount(): number {
     return this.enemies.length;
+  }
+
+  /** Blue-aura enemies grant a speed multiplier to nearby enemies each frame. */
+  private stepAura(): void {
+    if (this.enemies.length === 0) return;
+    for (const e of this.enemies) e.auraMult = 1;
+    for (const src of this.enemies) {
+      const boost = src.def.auraBoost;
+      if (!boost || !src.alive) continue;
+      const range = src.def.auraRange ?? 0.12;
+      const sp = src.object.position;
+      for (const e of this.enemies) {
+        if (e === src) continue;
+        const ep = e.object.position;
+        if (Math.hypot(ep.x - sp.x, ep.z - sp.z) <= range) e.auraMult = Math.max(e.auraMult, boost);
+      }
+    }
   }
 
   /** Towers acquire the nearest live enemy in range and fire on cooldown. */
@@ -844,6 +861,7 @@ export class BoardView {
       const dt = Math.min(0.05, now - this.lastT);
       this.lastT = now;
       const elapsed = now - this.clockStart;
+      this.stepAura();
       for (const u of this.units) u.update(dt, elapsed);
       if (this.baseHeart) this.baseHeart.update(dt, elapsed);
       if (this.rangeTTL > 0) {
