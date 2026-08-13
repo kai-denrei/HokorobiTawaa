@@ -160,7 +160,7 @@ function startAttract(): void {
   mode = 'attract';
   overlay.closePalette();
   overlay.hideResult();
-  board = generateBoard(seed, { targetCells: 130 });
+  board = generateBoard(seed, { targetCells: 210 });
   view.setBoard(board);
   view.highlightCell(null);
   setSeedInfo();
@@ -184,7 +184,7 @@ function newPlayBoard(): void {
   overlay.closePalette();
   overlay.hideResult();
   overlay.hideTitle();
-  board = generateBoard(seed, { targetCells: 130 });
+  board = generateBoard(seed, { targetCells: 210 });
   view.setBoard(board);
   view.highlightCell(null);
   setSeedInfo();

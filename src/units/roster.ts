@@ -56,7 +56,7 @@ export type UnitDef = {
 };
 
 // --- economy constants ------------------------------------------------------
-export const START_GOLD = 120;
+export const START_GOLD = 190;
 export const STREAK_STEP = 0.05;
 export const STREAK_CAP = 5;
 export const REFUND_FRACTION = 0.75;
