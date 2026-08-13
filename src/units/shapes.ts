@@ -224,40 +224,23 @@ function songsPts(): P[] {
   return fitUnit(pts);
 }
 
-function turretPts(): P[] {
+function cubePts(): P[] {
   const pts: P[] = [];
-  const bodyR = 0.55;
-  // squat cylindrical base
-  for (let iy = 0; iy <= 7; iy++) {
-    const y = -0.65 + (iy / 7) * 0.55;
-    const n = 22;
-    for (let a = 0; a < n; a++) {
-      const ang = (a / n) * 2 * Math.PI;
-      pts.push([bodyR * Math.cos(ang), y, bodyR * Math.sin(ang)]);
+  const N = 9; // grid per face
+  for (let axis = 0; axis < 3; axis++) {
+    for (const sign of [-1, 1]) {
+      for (let i = 0; i <= N; i++) {
+        for (let j = 0; j <= N; j++) {
+          const u = -1 + (2 * i) / N;
+          const v = -1 + (2 * j) / N;
+          const p: P = [0, 0, 0];
+          p[axis] = sign;
+          p[(axis + 1) % 3] = u;
+          p[(axis + 2) % 3] = v;
+          pts.push(p);
+        }
+      }
     }
-  }
-  // rounded turret cap
-  for (let i = 0; i < 160; i++) {
-    const d = fibDir(i, 160);
-    if (d[1]! < 0) continue;
-    pts.push([d[0]! * bodyR, -0.1 + d[1]! * 0.45, d[2]! * bodyR]);
-  }
-  // horizontal gun barrel (points +x)
-  const barR = 0.13;
-  const x0 = 0.15;
-  const len = 0.95;
-  const by = 0.08;
-  for (let ix = 0; ix <= 16; ix++) {
-    const x = x0 + (ix / 16) * len;
-    for (let a = 0; a < 9; a++) {
-      const ang = (a / 9) * 2 * Math.PI;
-      pts.push([x, by + barR * Math.cos(ang), barR * Math.sin(ang)]);
-    }
-  }
-  // muzzle ring
-  for (let a = 0; a < 12; a++) {
-    const ang = (a / 12) * 2 * Math.PI;
-    pts.push([x0 + len, by + barR * 1.25 * Math.cos(ang), barR * 1.25 * Math.sin(ang)]);
   }
   return fitUnit(pts);
 }
@@ -478,7 +461,7 @@ export const SHAPES: Record<string, ShapeDef> = {
   teardrop: toShape('teardrop', 'Teardrop', teardropPts()),
   songs: toShape('songs', 'SONGS Domes', songsPts()),
   pyramid: toShape('pyramid', 'Pyramid', pyramidPts()),
-  turret: toShape('turret', 'Turret', turretPts()),
+  cube: toShape('cube', 'Cube', cubePts()),
   dna: toShape('dna', 'DNA Helix', dnaPts()),
   butterfly: toShape('butterfly', 'Butterfly', butterflyPts()),
   knot: toShape('knot', 'Torus Knot', torusKnotPts()),
