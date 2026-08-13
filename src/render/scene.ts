@@ -154,6 +154,14 @@ export class BoardView {
     this.board = board;
     this.clearGroup();
     this.clearUnits();
+    this.buildTerrain();
+  }
+
+  /** (Re)build only the terrain geometry (boardGroup) from the current board —
+   * does NOT touch placed units. Used by the solid/wire toggle. */
+  private buildTerrain(): void {
+    const board = this.board;
+    if (!board) return;
 
     // buildable = raised green platforms (towers on top); blocked = grey walls;
     // path/spawn/base = low dark hallway floor. Batched per material.
@@ -265,11 +273,15 @@ export class BoardView {
     this.disposables.push(geo, mat);
   }
 
-  /** Switch mountains between wireframe and solid; rebuilds the current board. */
+  /** Switch mountains between wireframe and solid; rebuilds terrain only,
+   * leaving placed towers and enemies in place. */
   setMountainStyle(style: MountainStyle): void {
     if (this.mountainStyle === style) return;
     this.mountainStyle = style;
-    if (this.board) this.setBoard(this.board);
+    if (this.board) {
+      this.clearGroup(); // clears terrain (boardGroup) + highlight, NOT units
+      this.buildTerrain();
+    }
   }
 
   /** Place a tower (static dotted unit) on a cell. `cost` is recorded for refund. */
