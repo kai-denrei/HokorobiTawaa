@@ -305,6 +305,47 @@ html, body {
 .hk-result-title.is-won { color: var(--hk-green); text-shadow: 0 0 24px rgba(53,255,122,0.6); }
 .hk-result-sub { font-size: 13px; opacity: 0.7; margin-bottom: 6px; }
 
+/* ---- radial menu (tower placement / actions) ---- */
+.hk-radial {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  display: none;
+}
+.hk-radial.is-open { display: block; }
+.hk-radial-item {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 78px;
+  font: inherit;
+  color: var(--hk-green);
+  background: rgba(3, 20, 10, 0.95);
+  border: 1px solid var(--hk-green-dim);
+  border-radius: 11px;
+  padding: 8px 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.7);
+}
+.hk-radial-item:hover { border-color: var(--hk-green); box-shadow: 0 0 12px rgba(53,255,122,0.35); }
+.hk-radial-item:active { transform: translate(-50%, -50%) scale(0.96); }
+.hk-radial-item.is-locked { opacity: 0.4; }
+.hk-radial-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; box-shadow: 0 0 7px currentColor; margin-bottom: 2px; }
+.hk-radial-label { font-size: 12px; white-space: nowrap; }
+.hk-radial-cost { font-size: 10px; color: #ffd24a; }
+.hk-radial-center {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--hk-green);
+  box-shadow: 0 0 10px rgba(53,255,122,0.5);
+  pointer-events: none;
+}
+
 /* ---- spawn palette (bottom sheet) ---- */
 .hk-sheet {
   position: fixed;

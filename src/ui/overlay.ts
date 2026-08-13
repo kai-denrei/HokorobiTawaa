@@ -9,6 +9,9 @@ import { BUILD } from '../version';
 
 export type PaletteItem = { key: string; label: string; role: string; cost?: number; affordable?: boolean };
 
+export type RadialItem = { key: string; label: string; cost?: number; affordable?: boolean; color?: number };
+export type RadialHandlers = { onPick: (key: string) => void; onFocus?: (key: string) => void; onClose?: () => void };
+
 export type HudData = {
   lives: number;
   maxLives: number;
@@ -33,6 +36,8 @@ export type Overlay = {
   setSeedInfo: (text: string) => void;
   openPalette: (title: string, items: PaletteItem[], onPick: (key: string) => void) => void;
   openTowerMenu: (info: TowerMenuInfo, on: { onUpgrade: () => void; onSell: () => void }) => void;
+  openRadial: (cx: number, cy: number, items: RadialItem[], h: RadialHandlers) => void;
+  closeRadial: () => void;
   closePalette: () => void;
   setHud: (data: HudData) => void;
   showResult: (won: boolean) => void;
@@ -103,7 +108,10 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   tabLog.addEventListener('click', () => showTab('log'));
   tabRules.addEventListener('click', () => showTab('rules'));
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closePanel();
+    if (e.key === 'Escape') {
+      closePanel();
+      closeRadial();
+    }
   });
 
   // --- bottom bar ----------------------------------------------------------
@@ -214,7 +222,53 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   titleInner.append(titleName, titleTag, playBtn, titleDemo);
   titleScreen.append(titleInner);
 
-  root.append(top, hud, scrim, bottom, sheet, result, titleScreen);
+  // --- radial menu (tower placement / actions, positioned at the tap) ------
+  const radial = el('div', 'hk-radial');
+  let radialOnClose: (() => void) | null = null;
+  const closeRadial = (): void => {
+    if (!radial.classList.contains('is-open')) return;
+    radial.classList.remove('is-open');
+    radial.innerHTML = '';
+    const cb = radialOnClose;
+    radialOnClose = null;
+    cb?.();
+  };
+  radial.addEventListener('pointerdown', (e) => {
+    if (e.target === radial) closeRadial();
+  });
+  const openRadial = (cx: number, cy: number, items: RadialItem[], h: RadialHandlers): void => {
+    radial.innerHTML = '';
+    radialOnClose = h.onClose ?? null;
+    const R = 104;
+    const pad = 86;
+    const px = Math.max(pad, Math.min(window.innerWidth - pad, cx));
+    const py = Math.max(pad + 44, Math.min(window.innerHeight - pad - 60, cy));
+    const n = items.length;
+    items.forEach((it, i) => {
+      const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      const btn = el('button', 'hk-radial-item');
+      if (it.affordable === false) btn.classList.add('is-locked');
+      btn.style.left = px + Math.cos(ang) * R + 'px';
+      btn.style.top = py + Math.sin(ang) * R + 'px';
+      const dot = it.color != null ? `<span class="hk-radial-dot" style="color:#${it.color.toString(16).padStart(6, '0')}"></span>` : '';
+      const cost = it.cost != null ? `<span class="hk-radial-cost">◆${it.cost}</span>` : '';
+      btn.innerHTML = `${dot}<span class="hk-radial-label">${it.label}</span>${cost}`;
+      btn.addEventListener('click', () => {
+        if (it.affordable === false) return;
+        h.onPick(it.key);
+        closeRadial();
+      });
+      btn.addEventListener('pointerenter', () => h.onFocus?.(it.key));
+      radial.append(btn);
+    });
+    const center = el('div', 'hk-radial-center');
+    center.style.left = px + 'px';
+    center.style.top = py + 'px';
+    radial.append(center);
+    radial.classList.add('is-open');
+  };
+
+  root.append(top, hud, scrim, bottom, sheet, result, titleScreen, radial);
 
   return {
     setCellInfo: (text) => {
@@ -225,6 +279,8 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     },
     openPalette,
     openTowerMenu,
+    openRadial,
+    closeRadial,
     closePalette,
     setHud: (data) => {
       const low = data.lives <= 3 ? ' hk-lives-low' : '';

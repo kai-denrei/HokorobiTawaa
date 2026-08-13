@@ -224,6 +224,37 @@ function songsPts(): P[] {
   return fitUnit(pts);
 }
 
+function pyramidPts(): P[] {
+  const pts: P[] = [];
+  const apex: P = [0, 1, 0];
+  const by = -0.75;
+  const br = 0.9;
+  const c: P[] = [[br, by, br], [-br, by, br], [-br, by, -br], [br, by, -br]];
+  // four slanted faces (apex + two adjacent base corners), triangle-sampled
+  for (let f = 0; f < 4; f++) {
+    const A = apex;
+    const B = c[f]!;
+    const C = c[(f + 1) % 4]!;
+    const N = 9;
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N - i; j++) {
+        const u = i / N;
+        const v = j / N;
+        const w = 1 - u - v;
+        pts.push([A[0]! * w + B[0]! * u + C[0]! * v, A[1]! * w + B[1]! * u + C[1]! * v, A[2]! * w + B[2]! * u + C[2]! * v]);
+      }
+    }
+  }
+  // base square grid
+  const M = 8;
+  for (let i = 0; i <= M; i++) {
+    for (let j = 0; j <= M; j++) {
+      pts.push([br - (2 * br * i) / M, by, br - (2 * br * j) / M]);
+    }
+  }
+  return fitUnit(pts);
+}
+
 // ---- enemy shapes ----------------------------------------------------------
 function bflyR(d: P): number {
   const th = Math.atan2(d[1]!, d[0]!);
@@ -349,6 +380,7 @@ export const SHAPES: Record<string, ShapeDef> = {
   dspiral: toShape('dspiral', 'Double Spiral', dblSpiralPts()),
   teardrop: toShape('teardrop', 'Teardrop', teardropPts()),
   songs: toShape('songs', 'SONGS Domes', songsPts()),
+  pyramid: toShape('pyramid', 'Pyramid', pyramidPts()),
   dna: toShape('dna', 'DNA Helix', dnaPts()),
   butterfly: toShape('butterfly', 'Butterfly', butterflyPts()),
   knot: toShape('knot', 'Torus Knot', torusKnotPts()),

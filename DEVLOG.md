@@ -2,6 +2,20 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-13 — Radial menu, range viz, role colours, Pyramid slow tower
+
+- **Radial menu**: tapping a buildable cell opens a ring of options at the tap
+  (mobile-friendly) instead of the bottom sheet — towers to place on an empty
+  cell, Upgrade/Sell on an existing one. Each option shows a role-colour dot +
+  cost; unaffordable dimmed.
+- **Range viz**: a ground ring shows the effective range on placement preview
+  (updates as options are focused) and when selecting an existing tower.
+- **Role colour coding** (tower body + projectiles): white = single/sniper
+  (Pine, Spiral, Teardrop), orange = mortar (Gear), teal = spread (SONGS),
+  green = laser (DNA), red = homing (Double Spiral), purple = slow (Pyramid).
+- **Pyramid** tower (new shape) with a `slow` attack: purple rounds that apply a
+  speed debuff (enemies get a slow timer/factor honoured in movement).
+
 ## 2026-08-13 — Heart health meter at the exit + hurt effect
 
 - The base/exit cell is now marked by a big 3D halftone **Heart** (replaces the

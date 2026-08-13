@@ -1,6 +1,6 @@
 import './ui/styles.css';
 import { BoardView } from './render/scene';
-import { createOverlay, type PaletteItem } from './ui/overlay';
+import { createOverlay, type RadialItem } from './ui/overlay';
 import { generateBoard, type Board } from './board';
 import { TOWERS, ENEMIES } from './units/roster';
 import { Game } from './game/game';
@@ -48,56 +48,62 @@ view.onKill = (e) => {
   if (mode === 'play') game.onKill(e);
 };
 
-function toBuyItems(): PaletteItem[] {
-  return TOWERS.map((d) => ({
+// Radial menu to place a tower on an empty cell (near the tap), with a live
+// range preview as options are focused / on placement.
+function openPlaceRadial(cellId: number, x: number, y: number): void {
+  const items: RadialItem[] = TOWERS.map((d) => ({
     key: d.key,
     label: d.label,
-    role: d.role,
     cost: d.cost,
     affordable: game.canAfford(d.cost ?? 0),
+    color: d.color,
   }));
-}
-
-function openBuy(cellId: number): void {
-  overlay.openPalette(`Place tower · ◆${game.goldNow}`, toBuyItems(), (key) => {
-    const def = TOWERS.find((t) => t.key === key)!;
-    const cost = def.cost ?? 0;
-    if (game.spend(cost)) {
-      view.spawnTower(cellId, key, cost);
-      overlay.setCellInfo(`placed ${def.label}`);
-    } else {
-      overlay.setCellInfo('not enough gold');
-    }
+  view.showRange(cellId, TOWERS[0]!.range ?? 0, TOWERS[0]!.color ?? 0xffffff, 3);
+  overlay.openRadial(x, y, items, {
+    onFocus: (key) => {
+      const d = TOWERS.find((t) => t.key === key)!;
+      view.showRange(cellId, d.range ?? 0, d.color ?? 0xffffff, 3);
+    },
+    onPick: (key) => {
+      const d = TOWERS.find((t) => t.key === key)!;
+      const cost = d.cost ?? 0;
+      if (game.spend(cost)) {
+        view.spawnTower(cellId, key, cost);
+        view.showRange(cellId, d.range ?? 0, d.color ?? 0xffffff, 1.8);
+      } else {
+        overlay.setCellInfo('not enough gold');
+      }
+    },
   });
 }
 
-function openTowerMenuFor(cellId: number): void {
+// Radial menu for an existing tower: Upgrade / Sell, with its range shown.
+function openTowerRadial(cellId: number, x: number, y: number): void {
   const info = view.towerInfo(cellId);
   if (!info) return;
-  overlay.openTowerMenu(
-    {
-      label: info.label,
-      tier: info.tier,
-      nextCost: info.nextCost,
-      sellValue: info.sellValue,
-      canAffordUpgrade: info.nextCost != null && game.canAfford(info.nextCost),
-    },
-    {
-      onUpgrade: () => {
-        const inf = view.towerInfo(cellId);
-        if (inf && inf.nextCost != null && game.spend(inf.nextCost)) {
-          view.upgradeTower(cellId, inf.nextCost);
-          openTowerMenuFor(cellId); // refresh with new tier/costs
-        }
-      },
-      onSell: () => {
-        const inf = view.towerInfo(cellId);
+  view.showRange(cellId, info.range, info.color, 3);
+  const items: RadialItem[] = [];
+  if (info.nextCost != null) {
+    items.push({ key: 'upgrade', label: 'Upgrade', cost: info.nextCost, affordable: game.canAfford(info.nextCost), color: info.color });
+  } else {
+    items.push({ key: 'upgrade', label: 'Max tier', affordable: false, color: info.color });
+  }
+  items.push({ key: 'sell', label: `Sell +◆${info.sellValue}`, color: 0xff5a4e });
+  overlay.openRadial(x, y, items, {
+    onPick: (key) => {
+      const inf = view.towerInfo(cellId);
+      if (!inf) return;
+      if (key === 'upgrade' && inf.nextCost != null && game.spend(inf.nextCost)) {
+        view.upgradeTower(cellId, inf.nextCost);
+        const after = view.towerInfo(cellId);
+        if (after) view.showRange(cellId, after.range, after.color, 1.8);
+      } else if (key === 'sell') {
         view.sellTower(cellId);
-        game.addGold(inf ? inf.sellValue : 0);
-        overlay.setCellInfo('tower sold');
-      },
+        game.addGold(inf.sellValue);
+        view.hideRange();
+      }
     },
-  );
+  });
 }
 
 function setSeedInfo(): void {
@@ -198,16 +204,16 @@ canvas.addEventListener('pointerup', (e) => {
   view.highlightCell(hit?.cell ?? null);
   if (!hit) {
     overlay.setCellInfo('— no cell there —');
-    overlay.closePalette();
+    overlay.closeRadial();
     return;
   }
   const c = hit.cell;
   if (c.terrain === 'buildable') {
-    if (view.hasTower(c.id)) openTowerMenuFor(c.id);
-    else openBuy(c.id);
+    if (view.hasTower(c.id)) openTowerRadial(c.id, e.clientX, e.clientY);
+    else openPlaceRadial(c.id, e.clientX, e.clientY);
   } else {
     overlay.setCellInfo(`cell #${c.id} · ${c.terrain}`);
-    overlay.closePalette();
+    overlay.closeRadial();
   }
 });
 

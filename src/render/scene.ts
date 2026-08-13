@@ -33,6 +33,8 @@ type Projectile = {
   size: number;
   trail: THREE.Vector3[];
   trailMax: number;
+  slowF?: number;
+  slowD?: number;
 };
 
 const toWorld = (p: Vec2): [number, number, number] => [p[0] - 0.5, 0, p[1] - 0.5];
@@ -96,6 +98,8 @@ export class BoardView {
   private towerScale = 0.045;
   private enemyScale = 0.03;
   private baseHeart: HeartBase | null = null;
+  private rangeRing: THREE.LineLoop | null = null;
+  private rangeTTL = 0;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
@@ -343,7 +347,7 @@ export class BoardView {
   }
 
   /** Upgrade/sell info for the tower on a cell, or null if none. */
-  towerInfo(cellId: number): { label: string; tier: number; nextCost: number | null; sellValue: number } | null {
+  towerInfo(cellId: number): { label: string; tier: number; nextCost: number | null; sellValue: number; range: number; color: number } | null {
     const t = this.towerByCell.get(cellId);
     if (!t) return null;
     return {
@@ -351,6 +355,8 @@ export class BoardView {
       tier: t.tier,
       nextCost: upgradeCost(t.def, t.tier),
       sellValue: Math.round(t.spent * REFUND_FRACTION),
+      range: t.effRange,
+      color: t.def.color,
     };
   }
 
@@ -390,6 +396,37 @@ export class BoardView {
     return def.label;
   }
 
+  /** Draw a range ring on the ground at a cell. ttl>0 auto-hides after ttl secs. */
+  showRange(cellId: number, radius: number, color: number, ttl = 0): void {
+    this.hideRange();
+    if (!this.board || radius <= 0) return;
+    const cell = this.board.cells.get(cellId);
+    if (!cell) return;
+    const w = toWorld(cell.center);
+    const seg = 48;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.rangeRing = new THREE.LineLoop(geo, mat);
+    this.rangeRing.position.set(w[0], 0.03, w[2]);
+    this.scene.add(this.rangeRing);
+    this.rangeTTL = ttl;
+  }
+
+  hideRange(): void {
+    if (this.rangeRing) {
+      this.scene.remove(this.rangeRing);
+      this.rangeRing.geometry.dispose();
+      (this.rangeRing.material as THREE.Material).dispose();
+      this.rangeRing = null;
+    }
+    this.rangeTTL = 0;
+  }
+
   /** Base-heart health (0..1) and hit flash — driven by the game. */
   setBaseLives(frac: number): void {
     this.baseHeart?.setLives(frac);
@@ -400,6 +437,7 @@ export class BoardView {
   }
 
   clearUnits(): void {
+    this.hideRange();
     for (const u of this.units) {
       this.unitsGroup.remove(u.object);
       u.dispose();
@@ -470,6 +508,8 @@ export class BoardView {
           this.fireSpread(tp, target, dmg, t.def.projSpeed ?? 0.7, t.effPellets || 5, color, size);
         } else if (atk === 'homing') {
           this.fireHoming(tp, best, dmg, t.def.projSpeed ?? 0.6, color, size, trail);
+        } else if (atk === 'slow') {
+          this.fireSlow(tp, target, dmg, t.def.projSpeed ?? 0.9, color, size, trail, t.def.slowFactor ?? 0.5, t.def.slowDur ?? 1.5);
         } else {
           this.fireStraight(tp, target, dmg, t.def.projSpeed ?? 0.9, color, size, trail);
         }
@@ -493,6 +533,13 @@ export class BoardView {
     const l = dir.length() || 1;
     dir.multiplyScalar(speed / l);
     this.pushProj({ pos: from.clone(), vel: dir, kind: 'homing', target, damage: dmg, splash: 0, gravity: 0, ttl: 3, maxTtl: 3, color, size, trail: [], trailMax });
+  }
+
+  private fireSlow(from: THREE.Vector3, toPos: THREE.Vector3, dmg: number, speed: number, color: THREE.Color, size: number, trailMax: number, slowF: number, slowD: number): void {
+    const dir = new THREE.Vector3().subVectors(toPos, from);
+    const l = dir.length() || 1;
+    dir.multiplyScalar(speed / l);
+    this.pushProj({ pos: from.clone(), vel: dir, kind: 'single', target: null, damage: dmg, splash: 0, gravity: 0, ttl: 2, maxTtl: 2, color, size, trail: [], trailMax, slowF, slowD });
   }
 
   private fireSpread(from: THREE.Vector3, toPos: THREE.Vector3, dmg: number, speed: number, pellets: number, color: THREE.Color, size: number): void {
@@ -564,6 +611,7 @@ export class BoardView {
           const ep = e.object.position;
           if (Math.hypot(ep.x - p.pos.x, ep.y - p.pos.y, ep.z - p.pos.z) <= hitR) {
             e.damage(p.damage);
+            if (p.slowF) e.applySlow(p.slowF, p.slowD ?? 1.5);
             this.spawnBurst(p.pos, 4, { speed: 0.14, up: 0.02, size: p.size * 0.9, color: p.color, ttl: 0.14, gravity: 0 }); // hit spark
             done = true;
             break;
@@ -798,6 +846,10 @@ export class BoardView {
       const elapsed = now - this.clockStart;
       for (const u of this.units) u.update(dt, elapsed);
       if (this.baseHeart) this.baseHeart.update(dt, elapsed);
+      if (this.rangeTTL > 0) {
+        this.rangeTTL -= dt;
+        if (this.rangeTTL <= 0) this.hideRange();
+      }
       this.stepCombat(dt);
       this.updateProjectiles(dt);
       this.cullEnemies();

@@ -183,6 +183,8 @@ export class Enemy extends Unit {
   alive = true;
   /** Set once the enemy walks off the end of the path (reached the base). */
   reachedEnd = false;
+  private slowTimer = 0;
+  private slowFactor = 1;
 
   constructor(
     def: UnitDef,
@@ -223,12 +225,25 @@ export class Enemy extends Unit {
     return this.def.bounty ?? 0;
   }
 
+  /** Slow this enemy: `factor` speed multiplier for `dur` seconds (keeps the
+   * strongest active slow, refreshes the timer). */
+  applySlow(factor: number, dur: number): void {
+    this.slowFactor = this.slowTimer > 0 ? Math.min(this.slowFactor, factor) : factor;
+    this.slowTimer = Math.max(this.slowTimer, dur);
+  }
+
+  get slowed(): boolean {
+    return this.slowTimer > 0;
+  }
+
   override update(dt: number, elapsed: number): void {
     if (this.reachedEnd) {
       this.pose(elapsed);
       return;
     }
-    this.dist += this.speed * dt;
+    this.slowTimer = Math.max(0, this.slowTimer - dt);
+    const spd = this.slowTimer > 0 ? this.speed * this.slowFactor : this.speed;
+    this.dist += spd * dt;
     if (this.dist >= this.total) {
       this.dist = this.total;
       this.reachedEnd = true; // reached the base — the game will cost a life
