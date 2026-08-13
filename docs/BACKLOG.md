@@ -4,7 +4,16 @@ Deferred work and design directions, captured so they aren't lost. Not a
 changelog (see DEVLOG.md) — these are things we've decided are worth doing but
 haven't scheduled yet.
 
-## Visual identity of damage types (high priority polish)
+## Visual identity of damage types — DONE 2026-08-13 (first pass)
+
+Implemented: per-tower projectile colour + size (shader per-vertex size), dotted
+tracers/trails (Spiral, Double Spiral, Teardrop), Gear mortar = big amber shell +
+shockwave ring + debris burst, Teardrop = fast tight white round with long tracer,
+DNA = violet laser lance extending past target + impact halo, SONGS muzzle flash,
+enemy death poofs (scatter the enemy's colour), hit sparks. Still open below:
+a sniper charge-up tell, and the DNA lightning-chain proper (its own milestone).
+
+## Visual identity of damage types (original note)
 
 The five attack patterns (single / spread / homing / mortar / beam) currently
 all render as near-identical additive green dots + a fade line. They read as

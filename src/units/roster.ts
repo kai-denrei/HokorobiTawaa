@@ -27,6 +27,10 @@ export type UnitDef = {
   projSpeed?: number; // world units/sec (single/spread/homing)
   pellets?: number; // spread pellet count
   splash?: number; // mortar splash radius (world units)
+  /** projectile visual identity. */
+  projColor?: number; // projectile/beam tint (defaults to tower colour)
+  projSize?: number; // projectile point size (world units)
+  projTrail?: number; // trailing ghost-point count (0 = no tracer)
   /** enemy hit points at full health. */
   hp?: number;
   /** enemy gold bounty on kill. */
@@ -57,13 +61,13 @@ export function upgradeCost(def: UnitDef, currentTier: number): number | null {
 const TOWER_GREEN = 0x8affc0;
 
 export const TOWERS: UnitDef[] = [
-  { key: 'tree', label: 'Pine Tree', role: 'Basic · single shot', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.17, fireRate: 1.4, damage: 14, attack: 'single', projSpeed: 0.9, cost: 40 },
-  { key: 'gear', label: 'Gear', role: 'Mortar · splash', family: 'tower', color: TOWER_GREEN, rotX: -Math.PI / 2, spin: 0.7, idle: 'spin', range: 0.16, fireRate: 0.9, damage: 12, attack: 'mortar', splash: 0.07, cost: 110 },
-  { key: 'spiral', label: 'Spiral', role: 'Rapid single-target', family: 'tower', color: TOWER_GREEN, spin: 0.5, idle: 'spin', range: 0.16, fireRate: 3.0, damage: 7, attack: 'single', projSpeed: 1.2, cost: 70 },
-  { key: 'dspiral', label: 'Double Spiral', role: 'Homing bolts', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.16, fireRate: 1.2, damage: 9, attack: 'homing', projSpeed: 0.6, cost: 90 },
-  { key: 'teardrop', label: 'Teardrop', role: 'Sniper · hitscan beam', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.32, fireRate: 0.7, damage: 45, attack: 'beam', cost: 130 },
-  { key: 'songs', label: 'SONGS Domes', role: 'Spread shot', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.14, fireRate: 1.0, damage: 6, attack: 'spread', pellets: 5, projSpeed: 0.7, cost: 80 },
-  { key: 'dna', label: 'DNA Helix', role: 'Capstone · homing', family: 'tower', color: TOWER_GREEN, spin: 0.4, idle: 'spin', range: 0.22, fireRate: 1.5, damage: 18, attack: 'homing', projSpeed: 0.7, cost: 220 },
+  { key: 'tree', label: 'Pine Tree', role: 'Basic · single shot', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.17, fireRate: 1.4, damage: 14, attack: 'single', projSpeed: 0.9, cost: 40, projColor: 0x8affc0, projSize: 0.022, projTrail: 0 },
+  { key: 'gear', label: 'Gear', role: 'Mortar · splash', family: 'tower', color: TOWER_GREEN, rotX: -Math.PI / 2, spin: 0.7, idle: 'spin', range: 0.16, fireRate: 0.9, damage: 12, attack: 'mortar', splash: 0.07, cost: 110, projColor: 0xffb14e, projSize: 0.05 },
+  { key: 'spiral', label: 'Spiral', role: 'Rapid single-target', family: 'tower', color: TOWER_GREEN, spin: 0.5, idle: 'spin', range: 0.16, fireRate: 3.0, damage: 7, attack: 'single', projSpeed: 1.2, cost: 70, projColor: 0xbfff5a, projSize: 0.016, projTrail: 3 },
+  { key: 'dspiral', label: 'Double Spiral', role: 'Homing bolts', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.16, fireRate: 1.2, damage: 9, attack: 'homing', projSpeed: 0.6, cost: 90, projColor: 0x46d5ff, projSize: 0.024, projTrail: 6 },
+  { key: 'teardrop', label: 'Teardrop', role: 'Sniper · fast round', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.32, fireRate: 0.7, damage: 45, attack: 'single', projSpeed: 2.4, cost: 130, projColor: 0xffffff, projSize: 0.024, projTrail: 8 },
+  { key: 'songs', label: 'SONGS Domes', role: 'Spread shot', family: 'tower', color: TOWER_GREEN, idle: 'none', range: 0.14, fireRate: 1.0, damage: 6, attack: 'spread', pellets: 5, projSpeed: 0.7, cost: 80, projColor: 0x5affd0, projSize: 0.014, projTrail: 0 },
+  { key: 'dna', label: 'DNA Helix', role: 'Capstone · laser', family: 'tower', color: TOWER_GREEN, spin: 0.4, idle: 'spin', range: 0.24, fireRate: 1.5, damage: 18, attack: 'beam', cost: 220, projColor: 0xd0a0ff },
 ];
 
 export const ENEMIES: UnitDef[] = [

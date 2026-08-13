@@ -2,6 +2,18 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-13 — Damage-type visual identity
+
+- Projectiles now render via a per-vertex size+colour shader, so each tower has
+  its own look: colour, size, and dotted tracer trails.
+- Gear mortar → big amber shell + expanding shockwave ring + debris burst on
+  impact (heavier splash). Teardrop → fast tight white sniper round with a long
+  tracer. DNA → violet laser lance that extends past the target + impact halo.
+  Spiral/Double Spiral get tracers; SONGS gets a muzzle flash.
+- Particle sparks: muzzle flashes, hit sparks, mortar debris, and enemy death
+  poofs (the enemy's dot cloud scatters in its own colour on death).
+- New spark projectile kind (decorative, no collision) + shockwave-ring effects.
+
 ## 2026-08-13 — Economy + damage scaling
 
 - Gold economy (geoDefense model): start 120, income from kills only, bounty ×
