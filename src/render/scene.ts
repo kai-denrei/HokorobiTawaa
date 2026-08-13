@@ -55,6 +55,13 @@ const WALL_HEIGHT = 0.06;
 const BLOCK_INSET = 0.84;
 
 /** point-in-polygon (ray cast), board-space. */
+/** Board-space inset polygon matching a raised block's rendered top (BLOCK_INSET). */
+function insetPolygon(cell: Cell): Vec2[] {
+  const cx = cell.center[0];
+  const cy = cell.center[1];
+  return cell.polygon.map((p) => [cx + (p[0] - cx) * BLOCK_INSET, cy + (p[1] - cy) * BLOCK_INSET] as Vec2);
+}
+
 function pointInPolygon(px: number, py: number, poly: Vec2[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -108,6 +115,7 @@ export class BoardView {
   private lastT = 0;
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private topPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -WALL_HEIGHT);
   private disposables: { dispose(): void }[] = [];
   private running = false;
 
@@ -792,12 +800,27 @@ export class BoardView {
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(ndc, this.camera);
+
+    // 1) raised cells (buildable/blocked) — test the tap against their INSET TOP
+    //    (the visible platform surface at WALL_HEIGHT), not the hidden footprint.
+    const hitTop = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(this.topPlane, hitTop)) {
+      const bx = hitTop.x + 0.5;
+      const by = hitTop.z + 0.5;
+      for (const cell of this.board.cells.values()) {
+        if (cell.terrain !== 'buildable' && cell.terrain !== 'blocked') continue;
+        if (pointInPolygon(bx, by, insetPolygon(cell))) return { id: cell.id, cell };
+      }
+    }
+    // 2) low cells (path/spawn/base) — test the ground footprint.
     const hit = new THREE.Vector3();
-    if (!this.raycaster.ray.intersectPlane(this.groundPlane, hit)) return null;
-    const bx = hit.x + 0.5;
-    const by = hit.z + 0.5;
-    for (const cell of this.board.cells.values()) {
-      if (pointInPolygon(bx, by, cell.polygon)) return { id: cell.id, cell };
+    if (this.raycaster.ray.intersectPlane(this.groundPlane, hit)) {
+      const bx = hit.x + 0.5;
+      const by = hit.z + 0.5;
+      for (const cell of this.board.cells.values()) {
+        if (cell.terrain === 'buildable' || cell.terrain === 'blocked') continue;
+        if (pointInPolygon(bx, by, cell.polygon)) return { id: cell.id, cell };
+      }
     }
     return null;
   }
@@ -808,7 +831,8 @@ export class BoardView {
     const c = this.board.cells.get(cellId);
     if (!c) return null;
     const w = toWorld(c.center);
-    const v = new THREE.Vector3(w[0], 0, w[2]).project(this.camera);
+    const y = c.terrain === 'buildable' || c.terrain === 'blocked' ? WALL_HEIGHT : 0;
+    const v = new THREE.Vector3(w[0], y, w[2]).project(this.camera);
     const rect = this.canvas.getBoundingClientRect();
     return {
       x: rect.left + (v.x * 0.5 + 0.5) * rect.width,

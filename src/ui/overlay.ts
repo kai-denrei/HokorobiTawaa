@@ -10,7 +10,13 @@ import { BUILD } from '../version';
 export type PaletteItem = { key: string; label: string; role: string; cost?: number; affordable?: boolean };
 
 export type RadialItem = { key: string; label: string; cost?: number; affordable?: boolean; color?: number };
-export type RadialHandlers = { onPick: (key: string) => void; onFocus?: (key: string) => void; onClose?: () => void };
+export type RadialHandlers = {
+  onPick: (key: string) => void;
+  onFocus?: (key: string) => void;
+  onClose?: () => void;
+  /** live affordability check (re-run via refreshRadial when gold changes). */
+  canAfford?: (key: string) => boolean;
+};
 
 export type HudData = {
   lives: number;
@@ -37,6 +43,7 @@ export type Overlay = {
   openPalette: (title: string, items: PaletteItem[], onPick: (key: string) => void) => void;
   openTowerMenu: (info: TowerMenuInfo, on: { onUpgrade: () => void; onSell: () => void }) => void;
   openRadial: (cx: number, cy: number, items: RadialItem[], h: RadialHandlers) => void;
+  refreshRadial: () => void;
   closeRadial: () => void;
   closePalette: () => void;
   setHud: (data: HudData) => void;
@@ -225,10 +232,15 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   // --- radial menu (tower placement / actions, positioned at the tap) ------
   const radial = el('div', 'hk-radial');
   let radialOnClose: (() => void) | null = null;
+  let radialCanAfford: ((key: string) => boolean) | null = null;
+  let radialButtons: { it: RadialItem; btn: HTMLButtonElement }[] = [];
+  const isLocked = (it: RadialItem): boolean => (radialCanAfford ? !radialCanAfford(it.key) : it.affordable === false);
   const closeRadial = (): void => {
     if (!radial.classList.contains('is-open')) return;
     radial.classList.remove('is-open');
     radial.innerHTML = '';
+    radialButtons = [];
+    radialCanAfford = null;
     const cb = radialOnClose;
     radialOnClose = null;
     cb?.();
@@ -239,6 +251,8 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const openRadial = (cx: number, cy: number, items: RadialItem[], h: RadialHandlers): void => {
     radial.innerHTML = '';
     radialOnClose = h.onClose ?? null;
+    radialCanAfford = h.canAfford ?? null;
+    radialButtons = [];
     const R = 104;
     const pad = 86;
     const px = Math.max(pad, Math.min(window.innerWidth - pad, cx));
@@ -247,25 +261,30 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     items.forEach((it, i) => {
       const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
       const btn = el('button', 'hk-radial-item');
-      if (it.affordable === false) btn.classList.add('is-locked');
+      if (isLocked(it)) btn.classList.add('is-locked');
       btn.style.left = px + Math.cos(ang) * R + 'px';
       btn.style.top = py + Math.sin(ang) * R + 'px';
       const dot = it.color != null ? `<span class="hk-radial-dot" style="color:#${it.color.toString(16).padStart(6, '0')}"></span>` : '';
       const cost = it.cost != null ? `<span class="hk-radial-cost">◆${it.cost}</span>` : '';
       btn.innerHTML = `${dot}<span class="hk-radial-label">${it.label}</span>${cost}`;
       btn.addEventListener('click', () => {
-        if (it.affordable === false) return;
+        if (isLocked(it)) return;
         h.onPick(it.key);
         closeRadial();
       });
       btn.addEventListener('pointerenter', () => h.onFocus?.(it.key));
       radial.append(btn);
+      radialButtons.push({ it, btn });
     });
     const center = el('div', 'hk-radial-center');
     center.style.left = px + 'px';
     center.style.top = py + 'px';
     radial.append(center);
     radial.classList.add('is-open');
+  };
+  const refreshRadial = (): void => {
+    if (!radial.classList.contains('is-open')) return;
+    for (const { it, btn } of radialButtons) btn.classList.toggle('is-locked', isLocked(it));
   };
 
   root.append(top, hud, scrim, bottom, sheet, result, titleScreen, radial);
@@ -280,6 +299,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     openPalette,
     openTowerMenu,
     openRadial,
+    refreshRadial,
     closeRadial,
     closePalette,
     setHud: (data) => {

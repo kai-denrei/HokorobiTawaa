@@ -32,6 +32,7 @@ const game = new Game(view, {
   onHud: (d) => {
     overlay.setHud(d);
     view.setBaseLives(d.maxLives ? d.lives / d.maxLives : 1);
+    overlay.refreshRadial(); // gold changed → update affordability of an open menu
   },
   onResult: (status) => overlay.showResult(status === 'won'),
 });
@@ -60,6 +61,7 @@ function openPlaceRadial(cellId: number, x: number, y: number): void {
   }));
   view.showRange(cellId, TOWERS[0]!.range ?? 0, TOWERS[0]!.color ?? 0xffffff, 3);
   overlay.openRadial(x, y, items, {
+    canAfford: (key) => game.canAfford(TOWERS.find((t) => t.key === key)?.cost ?? 0),
     onFocus: (key) => {
       const d = TOWERS.find((t) => t.key === key)!;
       view.showRange(cellId, d.range ?? 0, d.color ?? 0xffffff, 3);
@@ -90,6 +92,11 @@ function openTowerRadial(cellId: number, x: number, y: number): void {
   }
   items.push({ key: 'sell', label: `Sell +◆${info.sellValue}`, color: 0xff5a4e });
   overlay.openRadial(x, y, items, {
+    canAfford: (key) => {
+      if (key === 'sell') return true;
+      const inf = view.towerInfo(cellId);
+      return !!inf && inf.nextCost != null && game.canAfford(inf.nextCost);
+    },
     onPick: (key) => {
       const inf = view.towerInfo(cellId);
       if (!inf) return;
