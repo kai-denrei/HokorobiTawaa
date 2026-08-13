@@ -13,6 +13,7 @@ import type { Board, Cell, Vec2 } from '../board';
 import { THEME, BLOOM } from './theme';
 import { Unit, Enemy, dotTexture } from '../units/unit';
 import { UNIT_BY_KEY, upgradeCost, REFUND_FRACTION } from '../units/roster';
+import { HeartBase } from './heart-base';
 
 export type MountainStyle = 'wire' | 'solid';
 
@@ -94,6 +95,7 @@ export class BoardView {
   private tmp = new THREE.Vector3();
   private towerScale = 0.045;
   private enemyScale = 0.03;
+  private baseHeart: HeartBase | null = null;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
@@ -177,6 +179,16 @@ export class BoardView {
     this.clearGroup();
     this.clearUnits();
     this.buildTerrain();
+
+    // big Heart at the exit/base cell (replaces the base marker) — the thing
+    // you're defending; persists across the solid/wire terrain toggle.
+    if (this.baseHeart) {
+      this.scene.remove(this.baseHeart.object);
+      this.baseHeart.dispose();
+    }
+    const bw = toWorld(board.cells.get(board.base)!.center);
+    this.baseHeart = new HeartBase(bw[0], bw[2], 0.095);
+    this.scene.add(this.baseHeart.object);
   }
 
   /** (Re)build only the terrain geometry (boardGroup) from the current board —
@@ -218,9 +230,8 @@ export class BoardView {
     this.addSolidBlocks(buildTris, THEME.buildSolid);
     this.addSolidBlocks(blockTris, THEME.mountainSolid);
 
-    // Accent markers for spawn(s) and base — small rings on the hallway floor.
+    // Accent ring(s) for spawn(s); the base is marked by the Heart (see setBoard).
     for (const s of board.spawns) this.addMarker(board.cells.get(s)!, THEME.spawn);
-    this.addMarker(board.cells.get(board.base)!, THEME.base);
   }
 
   private addLineSegments(positions: number[], color: number, opacity: number): void {
@@ -374,6 +385,15 @@ export class BoardView {
     this.units.push(e);
     this.enemies.push(e);
     return def.label;
+  }
+
+  /** Base-heart health (0..1) and hit flash — driven by the game. */
+  setBaseLives(frac: number): void {
+    this.baseHeart?.setLives(frac);
+  }
+
+  hitBase(): void {
+    this.baseHeart?.hit();
   }
 
   clearUnits(): void {
@@ -774,6 +794,7 @@ export class BoardView {
       this.lastT = now;
       const elapsed = now - this.clockStart;
       for (const u of this.units) u.update(dt, elapsed);
+      if (this.baseHeart) this.baseHeart.update(dt, elapsed);
       this.stepCombat(dt);
       this.updateProjectiles(dt);
       this.cullEnemies();
@@ -808,6 +829,11 @@ export class BoardView {
   dispose(): void {
     this.stop();
     window.removeEventListener('resize', this.resize);
+    if (this.baseHeart) {
+      this.scene.remove(this.baseHeart.object);
+      this.baseHeart.dispose();
+      this.baseHeart = null;
+    }
     this.clearUnits();
     this.clearGroup();
     this.renderer.dispose();

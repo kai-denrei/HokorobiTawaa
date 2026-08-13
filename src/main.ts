@@ -29,7 +29,10 @@ const overlay = createOverlay(app, {
 });
 
 const game = new Game(view, {
-  onHud: (d) => overlay.setHud(d),
+  onHud: (d) => {
+    overlay.setHud(d);
+    view.setBaseLives(d.maxLives ? d.lives / d.maxLives : 1);
+  },
   onResult: (status) => overlay.showResult(status === 'won'),
 });
 
@@ -38,10 +41,8 @@ view.onTick = (dt) => {
   else game.tick(dt);
 };
 view.onLeak = () => {
-  if (mode === 'play') {
-    game.leak();
-    overlay.hitHeart(); // heart flashes red + wave on every life lost
-  }
+  view.hitBase(); // heart at the exit flashes red + wave on every arrival
+  if (mode === 'play') game.leak();
 };
 view.onKill = (e) => {
   if (mode === 'play') game.onKill(e);
@@ -217,7 +218,7 @@ canvas.addEventListener('pointerup', (e) => {
   overlay,
   hurt: () => {
     game.leak();
-    overlay.hitHeart();
+    view.hitBase();
   },
   get board() {
     return board;

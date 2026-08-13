@@ -2,16 +2,17 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
-## 2026-08-13 — Heart health meter + hurt effect
+## 2026-08-13 — Heart health meter at the exit + hurt effect
 
-- Lives are now shown as the Braille "Heart" halftone point cloud (top-left),
-  **breathing** to represent health; its dot density = lives/maxLives.
-- On every leak (life lost) it snaps to the **Wave** treatment and flashes
-  **red with an explosion pulse** (dots scatter outward), then settles back to
-  green breathing — the requested "hurt" feedback.
-- Self-contained 2D-canvas widget (src/ui/heart-meter.ts), ported Heart shape +
-  breathe/wave treatments from Braille. HUD numeric ♥ replaced by the meter +
-  a small live count. Triggered from onLeak; maxLives added to the HUD state.
+- The base/exit cell is now marked by a big 3D halftone **Heart** (replaces the
+  teal hexagon), rendered as THREE.Points, **breathing** green to show health;
+  dot density = lives/maxLives.
+- On every arrival at the base it snaps to the **Wave** treatment and flashes
+  **red with an explosion pulse** (dots scatter outward), then settles back —
+  the requested "hurt" feedback, now at the point you're defending.
+- src/units/heart.ts (pure shape + breathe/wave) + src/render/heart-base.ts (the
+  3D meter, updated in the render loop). Driven by view.setBaseLives / hitBase
+  from the game; numeric ♥ stays in the HUD. (Old DOM heart widget removed.)
 
 ## 2026-08-13 — Damage-type visual identity
 
