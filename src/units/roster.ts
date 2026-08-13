@@ -70,14 +70,14 @@ const RED = 0xff5a4e; // homing
 const PURPLE = 0xb26bff; // slowing
 
 export const TOWERS: UnitDef[] = [
-  { key: 'tree', label: 'Pine Tree', role: 'Basic · single shot', family: 'tower', color: WHITE, idle: 'none', range: 0.17, fireRate: 1.4, damage: 14, attack: 'single', projSpeed: 0.9, cost: 40, projColor: WHITE, projSize: 0.022, projTrail: 0 },
-  { key: 'gear', label: 'Gear', role: 'Mortar · splash', family: 'tower', color: ORANGE, rotX: -Math.PI / 2, spin: 0.7, idle: 'spin', range: 0.16, fireRate: 0.9, damage: 12, attack: 'mortar', splash: 0.07, cost: 110, projColor: ORANGE, projSize: 0.05 },
-  { key: 'spiral', label: 'Spiral', role: 'Rapid single-target', family: 'tower', color: WHITE, spin: 0.5, idle: 'spin', range: 0.16, fireRate: 3.0, damage: 7, attack: 'single', projSpeed: 1.2, cost: 70, projColor: WHITE, projSize: 0.016, projTrail: 3 },
-  { key: 'dspiral', label: 'Double Spiral', role: 'Homing bolts', family: 'tower', color: RED, idle: 'none', range: 0.16, fireRate: 1.2, damage: 9, attack: 'homing', projSpeed: 0.6, cost: 90, projColor: RED, projSize: 0.024, projTrail: 6 },
-  { key: 'teardrop', label: 'Teardrop', role: 'Sniper · fast round', family: 'tower', color: WHITE, idle: 'none', range: 0.32, fireRate: 0.7, damage: 45, attack: 'single', projSpeed: 2.4, cost: 130, projColor: WHITE, projSize: 0.024, projTrail: 8 },
-  { key: 'songs', label: 'SONGS Domes', role: 'Spread · area', family: 'tower', color: TEAL, idle: 'none', range: 0.14, fireRate: 1.0, damage: 6, attack: 'spread', pellets: 5, projSpeed: 0.7, cost: 80, projColor: TEAL, projSize: 0.014, projTrail: 0 },
-  { key: 'pyramid', label: 'Pyramid', role: 'Slow field', family: 'tower', color: PURPLE, idle: 'none', range: 0.16, fireRate: 1.0, damage: 4, attack: 'slow', projSpeed: 0.9, cost: 100, projColor: PURPLE, projSize: 0.026, projTrail: 4, slowFactor: 0.45, slowDur: 1.6 },
-  { key: 'dna', label: 'DNA Helix', role: 'Capstone · laser', family: 'tower', color: GREEN, spin: 0.4, idle: 'spin', range: 0.24, fireRate: 1.5, damage: 18, attack: 'beam', cost: 220, projColor: GREEN },
+  { key: 'tree', label: 'Single Shot', role: 'Basic · single shot', family: 'tower', color: WHITE, idle: 'none', range: 0.17, fireRate: 1.4, damage: 14, attack: 'single', projSpeed: 0.9, cost: 40, projColor: WHITE, projSize: 0.022, projTrail: 0 },
+  { key: 'gear', label: 'AoE', role: 'Mortar · splash', family: 'tower', color: ORANGE, rotX: -Math.PI / 2, spin: 0.7, idle: 'spin', range: 0.16, fireRate: 0.9, damage: 12, attack: 'mortar', splash: 0.07, cost: 110, projColor: ORANGE, projSize: 0.05 },
+  { key: 'spiral', label: 'Rapid', role: 'Rapid single-target', family: 'tower', color: WHITE, spin: 0.5, idle: 'spin', range: 0.16, fireRate: 3.0, damage: 7, attack: 'single', projSpeed: 1.2, cost: 70, projColor: WHITE, projSize: 0.016, projTrail: 3 },
+  { key: 'dspiral', label: 'Homing', role: 'Homing bolts', family: 'tower', color: RED, idle: 'none', range: 0.16, fireRate: 1.2, damage: 9, attack: 'homing', projSpeed: 0.6, cost: 90, projColor: RED, projSize: 0.024, projTrail: 6 },
+  { key: 'teardrop', label: 'Sniper', role: 'Sniper · fast round', family: 'tower', color: WHITE, idle: 'none', range: 0.32, fireRate: 0.7, damage: 45, attack: 'single', projSpeed: 2.4, cost: 130, projColor: WHITE, projSize: 0.024, projTrail: 8 },
+  { key: 'songs', label: 'Spread', role: 'Spread · area', family: 'tower', color: TEAL, idle: 'none', range: 0.14, fireRate: 1.0, damage: 6, attack: 'spread', pellets: 5, projSpeed: 0.7, cost: 80, projColor: TEAL, projSize: 0.014, projTrail: 0 },
+  { key: 'pyramid', label: 'Slow', role: 'Slow field', family: 'tower', color: PURPLE, idle: 'none', range: 0.16, fireRate: 1.0, damage: 4, attack: 'slow', projSpeed: 0.9, cost: 100, projColor: PURPLE, projSize: 0.026, projTrail: 4, slowFactor: 0.45, slowDur: 1.6 },
+  { key: 'dna', label: 'Laser', role: 'Capstone · laser', family: 'tower', color: GREEN, spin: 0.4, idle: 'spin', range: 0.24, fireRate: 1.5, damage: 18, attack: 'beam', cost: 220, projColor: GREEN },
 ];
 
 export const ENEMIES: UnitDef[] = [
