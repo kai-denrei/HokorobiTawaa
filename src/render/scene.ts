@@ -9,11 +9,15 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import type { Board, Cell, Vec2 } from '../board';
+import type { Board, Cell } from '../board';
 import { THEME, BLOOM } from './theme';
 import { Unit, Enemy, dotTexture } from '../units/unit';
 import { UNIT_BY_KEY, upgradeCost, REFUND_FRACTION } from '../units/roster';
 import { HeartBase } from './heart-base';
+import {
+  toWorld, WALL_HEIGHT, cellRadius, insetPolygon, pointInPolygon, insetWorld,
+  appendBlockWire, appendBlockSolid,
+} from './coords';
 
 export type MountainStyle = 'wire' | 'solid';
 
@@ -37,44 +41,7 @@ type Projectile = {
   slowD?: number;
 };
 
-const toWorld = (p: Vec2): [number, number, number] => [p[0] - 0.5, 0, p[1] - 0.5];
-
-/** Approx cell radius = mean distance center→polygon vertices. */
-function cellRadius(cell: Cell): number {
-  let s = 0;
-  for (const v of cell.polygon) s += Math.hypot(v[0] - cell.center[0], v[1] - cell.center[1]);
-  return cell.polygon.length ? s / cell.polygon.length : 0.02;
-}
-
-/** Uniform flat elevation (world units) for raised cells (buildable platforms +
- * blocked walls). The path stays at ground as a low hallway. */
-const WALL_HEIGHT = 0.06;
-
-/** Shrink each raised block toward its centre so adjacent blocks leave a gap —
- * cleaner hallway read and clearance so walking enemies don't clip walls. */
-const BLOCK_INSET = 0.84;
-
-/** point-in-polygon (ray cast), board-space. */
-/** Board-space inset polygon matching a raised block's rendered top (BLOCK_INSET). */
-function insetPolygon(cell: Cell): Vec2[] {
-  const cx = cell.center[0];
-  const cy = cell.center[1];
-  return cell.polygon.map((p) => [cx + (p[0] - cx) * BLOCK_INSET, cy + (p[1] - cy) * BLOCK_INSET] as Vec2);
-}
-
-function pointInPolygon(px: number, py: number, poly: Vec2[]): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i]![0];
-    const yi = poly[i]![1];
-    const xj = poly[j]![0];
-    const yj = poly[j]![1];
-    const intersect =
-      yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
+// Pure coordinate + block-geometry helpers live in ./coords (unit-tested).
 
 export type PickHandler = (cellId: number | null, cell: Cell | null) => void;
 
@@ -244,11 +211,11 @@ export class BoardView {
 
     for (const cell of board.cells.values()) {
       if (cell.terrain === 'buildable') {
-        if (solid) this.pushBlockSolid(buildTris, cell);
-        else this.pushBlockWire(buildWire, cell);
+        if (solid) appendBlockSolid(buildTris, cell);
+        else appendBlockWire(buildWire, cell);
       } else if (cell.terrain === 'blocked') {
-        if (solid) this.pushBlockSolid(blockTris, cell);
-        else this.pushBlockWire(blockWire, cell);
+        if (solid) appendBlockSolid(blockTris, cell);
+        else appendBlockWire(blockWire, cell);
       } else {
         // path / spawn / base — low floor outline (the hallway enemies walk)
         const poly = cell.polygon;
@@ -282,47 +249,6 @@ export class BoardView {
     const seg = new THREE.LineSegments(geo, mat);
     this.boardGroup.add(seg);
     this.disposables.push(geo, mat);
-  }
-
-  /** Inset a cell-polygon vertex toward the cell centre (BLOCK_INSET), then to
-   * world XZ — leaves a gap between adjacent raised blocks. */
-  private insetWorld(cell: Cell, p: Vec2): [number, number, number] {
-    const bx = cell.center[0] + (p[0] - cell.center[0]) * BLOCK_INSET;
-    const by = cell.center[1] + (p[1] - cell.center[1]) * BLOCK_INSET;
-    return toWorld([bx, by]);
-  }
-
-  /** Wireframe raised block: inset base ring + flat top ring at WALL_HEIGHT,
-   * joined by vertical ribs. */
-  private pushBlockWire(target: number[], cell: Cell): void {
-    const poly = cell.polygon;
-    const n = poly.length;
-    if (n < 3) return;
-    const H = WALL_HEIGHT;
-    for (let i = 0; i < n; i++) {
-      const a = this.insetWorld(cell, poly[i]!);
-      const b = this.insetWorld(cell, poly[(i + 1) % n]!);
-      target.push(a[0], 0, a[2], b[0], 0, b[2]); // base edge
-      target.push(a[0], H, a[2], b[0], H, b[2]); // flat top edge
-      target.push(a[0], 0, a[2], a[0], H, a[2]); // vertical rib
-    }
-  }
-
-  /** Solid raised block: side quads (2 tris/edge) + flat top cap (fan from the
-   * cell centre). DoubleSide material makes winding irrelevant. */
-  private pushBlockSolid(target: number[], cell: Cell): void {
-    const poly = cell.polygon;
-    const n = poly.length;
-    if (n < 3) return;
-    const H = WALL_HEIGHT;
-    const c = toWorld(cell.center);
-    for (let i = 0; i < n; i++) {
-      const a = this.insetWorld(cell, poly[i]!);
-      const b = this.insetWorld(cell, poly[(i + 1) % n]!);
-      target.push(a[0], 0, a[2], b[0], 0, b[2], b[0], H, b[2]);
-      target.push(a[0], 0, a[2], b[0], H, b[2], a[0], H, a[2]);
-      target.push(c[0], H, c[2], a[0], H, a[2], b[0], H, b[2]);
-    }
   }
 
   private addSolidBlocks(positions: number[], color: number): void {
@@ -490,8 +416,8 @@ export class BoardView {
     for (const id of interior) {
       const c = this.board.cells.get(id);
       if (!c) continue;
-      this.pushBlockSolid(tris, c);
-      this.pushBlockWire(wire, c);
+      appendBlockSolid(tris, c);
+      appendBlockWire(wire, c);
     }
     const group = new THREE.Group();
     if (tris.length) {
@@ -993,8 +919,8 @@ export class BoardView {
     const n = poly.length;
     const segs: number[] = [];
     for (let i = 0; i < n; i++) {
-      const a = raised ? this.insetWorld(cell, poly[i]!) : toWorld(poly[i]!);
-      const b = raised ? this.insetWorld(cell, poly[(i + 1) % n]!) : toWorld(poly[(i + 1) % n]!);
+      const a = raised ? insetWorld(cell, poly[i]!) : toWorld(poly[i]!);
+      const b = raised ? insetWorld(cell, poly[(i + 1) % n]!) : toWorld(poly[(i + 1) % n]!);
       segs.push(a[0], H, a[2], b[0], H, b[2]); // top ring
       if (raised) {
         segs.push(a[0], 0, a[2], b[0], 0, b[2]); // base ring
