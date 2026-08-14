@@ -4,8 +4,13 @@
 
 import * as THREE from 'three';
 import { SHAPES } from './shapes';
-import type { UnitDef } from './roster';
+import type { UnitDef, Idle } from './roster';
 import { UP_DAMAGE, UP_RANGE, UP_RATE } from './roster';
+
+/** Towers animate by upgrade tier: 0 = static, 1 = spin, 2 = twist. Cheap — a
+ * spin is an O(1) transform; a twist rewrites the (small) point buffer/frame. */
+const TOWER_TIER_IDLE: Idle[] = ['none', 'spin', 'twist'];
+const TOWER_SPIN = 0.6; // rad/s for the tier-1 spin
 
 // --- 'solving' idle: Rubik band-turn engine, ported from Braille "Primitives".
 // A fixed sequence of axis-slab quarter-turns is applied and un-applied in a
@@ -150,7 +155,8 @@ export class Unit {
     this.effFireRate = def.fireRate ?? 0;
     this.effSplash = def.splash ?? 0;
     this.effPellets = def.pellets ?? 0;
-    this.perPoint = def.idle === 'wave' || def.idle === 'twist' || def.idle === 'solving';
+    // Towers may reach the tier-2 twist, so keep their buffer dynamic-ready.
+    this.perPoint = def.family === 'tower' || def.idle === 'wave' || def.idle === 'twist' || def.idle === 'solving';
 
     const baked = bakeRotX(shape.positions, def.rotX ?? 0);
     shuffleTriples(baked);
@@ -193,11 +199,19 @@ export class Unit {
     return this.def.idle === 'bob' ? this.baseScale * 0.6 * (0.5 + 0.5 * Math.sin(elapsed * 1.6 + this.phase)) : 0;
   }
 
+  /** The idle actually played: towers derive it from upgrade tier; enemies use
+   * their fixed def.idle. */
+  protected effectiveIdle(): Idle {
+    if (this.def.family === 'tower') return TOWER_TIER_IDLE[Math.min(this.tier, 2)]!;
+    return this.def.idle;
+  }
+
   /** Rotation + scale idle pose (position handled by caller). */
-  protected pose(elapsed: number): void {
+  protected pose(elapsed: number, idle: Idle): void {
     const o = this.object;
-    if (this.def.spin) o.rotation.y = elapsed * this.def.spin;
-    switch (this.def.idle) {
+    if (this.def.family === 'tower') o.rotation.y = idle === 'spin' ? elapsed * TOWER_SPIN : 0;
+    else if (this.def.spin) o.rotation.y = elapsed * this.def.spin;
+    switch (idle) {
       case 'breathe': {
         const s = this.baseScale * (1 + 0.12 * Math.sin(elapsed * 2 + this.phase));
         o.scale.setScalar(s);
@@ -220,11 +234,11 @@ export class Unit {
     }
   }
 
-  /** wave/twist rewrite the geometry buffer from the static base each frame. */
-  private animatePerPoint(elapsed: number): void {
+  /** wave/twist/solving rewrite the geometry buffer from the static base each frame. */
+  private animatePerPoint(elapsed: number, idle: Idle): void {
     const b = this.baseArr;
     const w = this.workArr;
-    if (this.def.idle === 'solving') {
+    if (idle === 'solving') {
       const amount = solveCycle(elapsed, SOLVE_MOVES.length, 0.42, 1.2);
       for (let i = 0; i < b.length; i += 3) {
         const p = applyMoves(b[i]!, b[i + 1]!, b[i + 2]!, amount);
@@ -232,7 +246,7 @@ export class Unit {
         w[i + 1] = p[1];
         w[i + 2] = p[2];
       }
-    } else if (this.def.idle === 'wave') {
+    } else if (idle === 'wave') {
       for (let i = 0; i < b.length; i += 3) {
         const x = b[i]!;
         const y = b[i + 1]!;
@@ -260,8 +274,9 @@ export class Unit {
   }
 
   protected animateIdle(elapsed: number): void {
-    if (this.perPoint) this.animatePerPoint(elapsed);
-    else this.pose(elapsed);
+    const idle = this.effectiveIdle();
+    if (idle === 'wave' || idle === 'twist' || idle === 'solving') this.animatePerPoint(elapsed, idle);
+    else this.pose(elapsed, idle);
   }
 
   /** Apply one upgrade tier: boost effective stats + a tier-2 signature bump. */

@@ -598,6 +598,146 @@ function torusPts(): P[] {
   return fitUnit(pts);
 }
 
+function dotV(a: P, b: P): number {
+  return a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+}
+
+// sphere — a plain Fibonacci-lattice point ball. Ported from Braille "Fun Shapes".
+function spherePts(): P[] {
+  const pts: P[] = [];
+  for (let i = 0; i < 520; i++) pts.push(fibDir(i, 520));
+  return fitUnit(pts);
+}
+
+// cone — a tapering side wall from a base disc up to an apex. Ported from Braille.
+function conePts(): P[] {
+  const pts: P[] = [];
+  const R = 0.82;
+  const H = 1.6;
+  const ny = 18;
+  for (let iy = 0; iy <= ny; iy++) {
+    const f = iy / ny;
+    const y = -H / 2 + f * H;
+    const r = R * (1 - f);
+    for (let a = 0; a < 26; a++) {
+      const ang = (a / 26) * 2 * Math.PI;
+      pts.push([r * Math.cos(ang), y, r * Math.sin(ang)]);
+    }
+  }
+  for (let ir = 0; ir <= 8; ir++) {
+    const rr = (R * ir) / 8;
+    const n = Math.max(1, Math.round((26 * ir) / 8));
+    for (let a = 0; a < n; a++) {
+      const ang = (a / n) * 2 * Math.PI;
+      pts.push([rr * Math.cos(ang), -H / 2, rr * Math.sin(ang)]); // base disc
+    }
+  }
+  return fitUnit(pts);
+}
+
+// bipyramid — two square pyramids joined base-to-base (double-inverted octahedron).
+// Ported from Braille "Fun Shapes" (polyFaces fan-fill + edge trace).
+function fillTri(pts: P[], A: P, B: P, C: P, n: number): void {
+  for (let i = 0; i <= n; i++)
+    for (let j = 0; j <= n - i; j++) {
+      const u = i / n;
+      const v = j / n;
+      const w = 1 - u - v;
+      pts.push([A[0]! * w + B[0]! * u + C[0]! * v, A[1]! * w + B[1]! * u + C[1]! * v, A[2]! * w + B[2]! * u + C[2]! * v]);
+    }
+}
+function traceEdge(pts: P[], A: P, B: P, n: number): void {
+  for (let s = 0; s <= n; s++) {
+    const t = s / n;
+    pts.push([A[0]! + (B[0]! - A[0]!) * t, A[1]! + (B[1]! - A[1]!) * t, A[2]! + (B[2]! - A[2]!) * t]);
+  }
+}
+function polyFaces(verts: P[], faces: number[][], fN: number, eN: number): P[] {
+  const pts: P[] = [];
+  const seen = new Set<string>();
+  for (const f of faces) for (let k = 1; k < f.length - 1; k++) fillTri(pts, verts[f[0]!]!, verts[f[k]!]!, verts[f[k + 1]!]!, fN);
+  for (const f of faces)
+    for (let k = 0; k < f.length; k++) {
+      const a = f[k]!;
+      const b = f[(k + 1) % f.length]!;
+      const key = Math.min(a, b) + ',' + Math.max(a, b);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      traceEdge(pts, verts[a]!, verts[b]!, eN);
+    }
+  return pts;
+}
+function bipyramidPts(): P[] {
+  const v: P[] = [[0, 1.15, 0], [0, -1.15, 0], [0.82, 0, 0.82], [-0.82, 0, 0.82], [-0.82, 0, -0.82], [0.82, 0, -0.82]];
+  const f = [[0, 2, 3], [0, 3, 4], [0, 4, 5], [0, 5, 2], [1, 3, 2], [1, 4, 3], [1, 5, 4], [1, 2, 5]];
+  return fitUnit(polyFaces(v, f, 5, 8));
+}
+
+// amoeba — an irregular blob throwing out pseudopods, with a nucleus + vacuoles.
+// Ported from Braille "Fun Shapes".
+function amoebaPts(): P[] {
+  const pts: P[] = [];
+  const N = 620;
+  const pods: P[] = [[1, 0.2, 0.3], [-0.6, 0.1, 0.8], [0.2, -0.3, -0.9], [-0.9, 0.4, -0.2], [0.4, 0.85, 0.1]];
+  const bump = (d: P): number => {
+    let r = 0.6 + 0.06 * Math.sin(4 * d[0]! + 3 * d[2]!);
+    for (const p of pods) r += 0.42 * Math.pow(Math.max(0, dotV(d, normV(p))), 6);
+    return r;
+  };
+  for (let i = 0; i < N; i++) {
+    const d = fibDir(i, N);
+    const r = bump(d);
+    pts.push([d[0]! * r, d[1]! * r * 0.85, d[2]! * r]);
+  }
+  for (let i = 0; i < 44; i++) {
+    const d = fibDir(i, 44); // nucleus
+    pts.push([0.12 + d[0]! * 0.17, -0.05 + d[1]! * 0.17, d[2]! * 0.17]);
+  }
+  for (const [cx, cy, cz, vr] of [[-0.3, 0.1, 0.12, 0.12], [0.12, 0.28, -0.16, 0.09]]) {
+    for (let a = 0; a < 14; a++) {
+      const ang = (a / 14) * 2 * Math.PI; // vacuoles
+      pts.push([cx! + vr! * Math.cos(ang), cy! + vr! * Math.sin(ang), cz!]);
+    }
+  }
+  return fitUnit(pts);
+}
+
+// jellyfish — a translucent bell trailing wavy tentacles + frilly oral arms.
+// Ported from Braille "Fun Shapes".
+function jellyfishPts(): P[] {
+  const pts: P[] = [];
+  const R = 0.62;
+  for (let i = 0; i < 300; i++) {
+    const d = fibDir(i, 300);
+    if (d[1]! < 0) continue;
+    const wob = 1 + 0.05 * Math.sin(6 * Math.atan2(d[2]!, d[0]!));
+    pts.push([d[0]! * R * wob, 0.2 + d[1]! * R * 0.8, d[2]! * R * wob]); // bell
+  }
+  for (let a = 0; a < 40; a++) {
+    const ang = (a / 40) * 2 * Math.PI;
+    pts.push([R * Math.cos(ang), 0.2, R * Math.sin(ang)]); // rim
+  }
+  for (let k = 0; k < 16; k++) {
+    const ang = (k / 16) * 2 * Math.PI;
+    const cx = R * 0.9 * Math.cos(ang);
+    const cz = R * 0.9 * Math.sin(ang);
+    for (let s = 0; s <= 20; s++) {
+      const f = s / 20;
+      const sway = 0.12 * Math.sin(f * 6 + ang * 2);
+      pts.push([cx + sway * Math.cos(ang), 0.2 - f * 1.1, cz + sway * Math.sin(ang)]); // tentacles
+    }
+  }
+  for (let k = 0; k < 4; k++) {
+    const ang = (k / 4) * 2 * Math.PI + 0.4;
+    for (let s = 0; s <= 12; s++) {
+      const f = s / 12;
+      const r = 0.16 * (1 - f * 0.5);
+      pts.push([r * Math.cos(ang) + 0.05 * Math.sin(f * 8), 0.15 - f * 0.6, r * Math.sin(ang)]); // oral arms
+    }
+  }
+  return fitUnit(pts);
+}
+
 export type ShapeDef = {
   key: string;
   label: string;
@@ -638,4 +778,9 @@ export const SHAPES: Record<string, ShapeDef> = {
   phage: toShape('phage', 'Bacteriophage', phagePts()),
   saturn: toShape('saturn', 'Saturn', saturnPts()),
   torus: toShape('torus', 'Torus', torusPts()),
+  sphere: toShape('sphere', 'Sphere', spherePts()),
+  cone: toShape('cone', 'Cone', conePts()),
+  bipyramid: toShape('bipyramid', 'Bipyramid', bipyramidPts()),
+  amoeba: toShape('amoeba', 'Amoeba', amoebaPts()),
+  jellyfish: toShape('jellyfish', 'Jellyfish', jellyfishPts()),
 };
