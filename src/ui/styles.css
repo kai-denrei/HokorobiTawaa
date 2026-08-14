@@ -260,6 +260,23 @@ html, body {
   box-shadow: 0 0 10px rgba(53,255,122,0.6);
 }
 .hk-setup-hint { margin-top: 12px; font-size: 12px; line-height: 1.5; opacity: 0.6; }
+.hk-qseg { display: flex; gap: 6px; }
+.hk-qbtn {
+  flex: 1 1 0;
+  font: inherit; font-size: 12px; text-transform: capitalize;
+  color: var(--hk-green);
+  background: rgba(3, 20, 10, 0.7);
+  border: 1px solid var(--hk-green-dim);
+  border-radius: 8px;
+  padding: 8px 6px;
+  cursor: pointer;
+}
+.hk-qbtn:hover { border-color: var(--hk-green); }
+.hk-qbtn.is-active {
+  color: #041;
+  background: var(--hk-green);
+  box-shadow: 0 0 12px rgba(53,255,122,0.4);
+}
 
 /* ---- attract / title screen ---- */
 .hk-title {
@@ -276,30 +293,26 @@ html, body {
 }
 .hk-title.is-open { display: flex; }
 .hk-title-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 94vw; padding: 0 16px; box-sizing: border-box; }
-.hk-title-name {
-  font-size: clamp(17px, 6.4vw, 30px);
-  letter-spacing: clamp(0.06em, 1.2vw, 0.14em);
-  text-transform: uppercase;
-  color: var(--hk-green);
-  text-shadow: 0 0 20px rgba(53,255,122,0.6), 0 2px 12px rgba(0,0,0,0.9);
-}
-.hk-title-name .hk-kanji { font-size: clamp(19px, 7.2vw, 34px); }
-.hk-title-tag { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--hk-green); opacity: 0.6; margin-bottom: 18px; }
+.hk-title-name { width: min(560px, 92vw); }
+.hk-title-tag { width: min(560px, 92vw); margin-bottom: 14px; }
 .hk-play {
   pointer-events: auto;
-  font: inherit;
-  font-size: 20px;
-  letter-spacing: 0.1em;
-  color: #041;
-  background: var(--hk-green);
   border: none;
-  border-radius: 12px;
-  padding: 14px 48px;
+  background: transparent;
+  padding: 0;
   cursor: pointer;
-  box-shadow: 0 0 30px rgba(53,255,122,0.5);
+  line-height: 0;
 }
 .hk-play:active { transform: translateY(1px); }
 .hk-title-demo { font-size: 11px; letter-spacing: 0.14em; color: var(--hk-green); opacity: 0.4; margin-top: 16px; }
+
+/* ---- ported LED/nixie/starburst display canvases ---- */
+.hk-dm-canvas { display: block; width: 100%; }
+.hk-dm-title { height: clamp(96px, 19vw, 150px); }
+.hk-dm-sub { height: clamp(30px, 6vw, 44px); }
+.hk-dm-play { width: min(240px, 74vw); height: 62px; }
+.hk-seg-canvas { display: block; width: min(560px, 90vw); height: clamp(80px, 16vw, 130px); }
+.hk-nixie-canvas { display: block; width: 100%; height: 100%; }
 
 /* ---- health widget (heart meter) ---- */
 .hk-health {
@@ -362,16 +375,32 @@ html, body {
   backdrop-filter: blur(3px);
 }
 .hk-result.is-open { display: flex; }
-.hk-result-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-.hk-result-title {
-  font-size: 40px;
-  letter-spacing: 0.12em;
-  color: #ff6a6a;
-  text-shadow: 0 0 20px rgba(255,80,80,0.6);
+.hk-result-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 94vw; }
+.hk-result-title { line-height: 0; }
+.hk-result-sub { font-size: 13px; opacity: 0.7; }
+.hk-result-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+/* kills-by-type histogram on the result screen */
+.hk-hist { width: min(420px, 88vw); display: flex; flex-direction: column; gap: 5px; }
+.hk-hist-head { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; margin-bottom: 2px; }
+.hk-hist-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.hk-hist-name { flex: 0 0 96px; text-align: right; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hk-hist-track { flex: 1 1 auto; height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
+.hk-hist-bar { height: 100%; border-radius: 5px; box-shadow: 0 0 8px currentColor; opacity: 0.9; }
+.hk-hist-num { flex: 0 0 28px; text-align: left; color: #bffcd6; }
+
+/* score nixie box, top-right during play */
+.hk-score {
+  position: fixed;
+  top: calc(max(env(safe-area-inset-top), 10px) + 40px);
+  right: 12px;
+  z-index: 9;
+  width: clamp(120px, 34vw, 168px);
+  height: clamp(42px, 12vw, 58px);
+  pointer-events: none;
+  display: none;
 }
-.hk-result-title.is-won { color: var(--hk-green); text-shadow: 0 0 24px rgba(53,255,122,0.6); }
-.hk-result-sub { font-size: 13px; opacity: 0.7; margin-bottom: 6px; }
-.hk-result-actions { display: flex; gap: 10px; align-items: center; }
+.hk-score.is-on { display: block; }
 
 /* ---- radial menu (tower placement / actions) ---- */
 .hk-radial {

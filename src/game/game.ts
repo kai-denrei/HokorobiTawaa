@@ -16,13 +16,23 @@ export type HudState = {
   wave: number; // 1-based; 0 before the first wave
   totalWaves: number;
   loop: number; // 1-based; increments each Continue
+  score: number; // cumulative kill value (bounty × mult), never spent
   status: GameStatus;
   message: string;
 };
 
+/** End-of-run stats for the result screen. */
+export type RunStats = {
+  score: number;
+  kills: number;
+  loop: number;
+  /** enemy unit-key → count killed this run (across loops). */
+  killsByType: Record<string, number>;
+};
+
 export type GameCallbacks = {
   onHud: (s: HudState) => void;
-  onResult: (status: 'won' | 'lost') => void;
+  onResult: (status: 'won' | 'lost', stats: RunStats) => void;
   /** Open alternate route `index` (0 after wave 6, 1 after wave 9). No-op in
    * the view if the board has no such alternate. */
   onOpenPath?: (index: number) => void;
@@ -70,6 +80,8 @@ export class Game {
   private lives = START_LIVES;
   private gold = START_GOLD;
   private streak = 0;
+  private score = 0;
+  private killsByType: Record<string, number> = {};
   private waveIndex = -1;
   private loop = 1;
   private status: GameStatus = 'ready';
@@ -92,6 +104,8 @@ export class Game {
     this.lives = START_LIVES;
     this.gold = START_GOLD;
     this.streak = 0;
+    this.score = 0;
+    this.killsByType = {};
     this.waveIndex = -1;
     this.loop = 1;
     this.status = 'ready';
@@ -128,17 +142,27 @@ export class Game {
     this.streak = 0;
     if (this.lives === 0) {
       this.status = 'lost';
-      this.cb.onResult('lost');
+      this.cb.onResult('lost', this.runStats());
     }
     this.emitHud();
   }
 
-  /** An enemy was killed: grow the streak and award bounty × multiplier. */
+  /** An enemy was killed: grow the streak, award bounty × multiplier (to both
+   * gold and the run score), and tally the kill by enemy type. */
   onKill(e: Enemy): void {
     if (this.status === 'won' || this.status === 'lost') return;
     this.streak++;
-    this.gold += Math.round(e.bounty * this.multiplier());
+    const award = Math.round(e.bounty * this.multiplier());
+    this.gold += award;
+    this.score += award;
+    this.killsByType[e.def.key] = (this.killsByType[e.def.key] ?? 0) + 1;
     this.emitHud();
+  }
+
+  private runStats(): RunStats {
+    let kills = 0;
+    for (const k in this.killsByType) kills += this.killsByType[k]!;
+    return { score: this.score, kills, loop: this.loop, killsByType: { ...this.killsByType } };
   }
 
   multiplier(): number {
@@ -181,7 +205,7 @@ export class Game {
     if (this.spawningDone && this.view.enemyCount === 0) {
       if (this.waveIndex >= this.waves.length - 1) {
         this.status = 'won';
-        this.cb.onResult('won');
+        this.cb.onResult('won', this.runStats());
       } else {
         this.status = 'ready';
         this.countdown = BETWEEN_DELAY;
@@ -243,6 +267,7 @@ export class Game {
       wave: Math.max(0, this.waveIndex + 1),
       totalWaves: this.waves.length,
       loop: this.loop,
+      score: this.score,
       status: this.status,
       message,
     });

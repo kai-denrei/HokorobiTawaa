@@ -47,7 +47,7 @@ const game = new Game(view, {
     view.setBaseLives(d.maxLives ? d.lives / d.maxLives : 1);
     overlay.refreshRadial(); // gold changed → update affordability of an open menu
   },
-  onResult: (status) => overlay.showResult(status === 'won'),
+  onResult: (status, stats) => overlay.showResult(status === 'won', stats),
   onOpenPath: (index) => view.openPath(index),
 });
 

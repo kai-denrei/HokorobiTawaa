@@ -7,8 +7,9 @@ import rulesRaw from '../../RULES.md?raw';
 import { renderMarkdown } from './markdown';
 import { BUILD } from '../version';
 import { versionGlyphsHTML, applyGlyphFavicon } from '../version-glyph';
-import { TOWERS, ENEMIES, type UnitDef } from '../units/roster';
+import { TOWERS, ENEMIES, UNIT_BY_KEY, type UnitDef } from '../units/roster';
 import { drawSprite } from './sprite';
+import { createDisplay, setQuality, getQuality, isAutoQuality, onQualityChange, type Quality } from './displays';
 
 export type PaletteItem = { key: string; label: string; role: string; cost?: number; affordable?: boolean };
 
@@ -29,8 +30,17 @@ export type HudData = {
   wave: number;
   totalWaves: number;
   loop: number;
+  score: number;
   message: string;
   status: string;
+};
+
+/** End-of-run stats for the result screen (mirrors game RunStats). */
+export type ResultStats = {
+  score: number;
+  kills: number;
+  loop: number;
+  killsByType: Record<string, number>;
 };
 
 export type TowerMenuInfo = {
@@ -51,7 +61,7 @@ export type Overlay = {
   closeRadial: () => void;
   closePalette: () => void;
   setHud: (data: HudData) => void;
-  showResult: (won: boolean) => void;
+  showResult: (won: boolean, stats?: ResultStats) => void;
   hideResult: () => void;
   showTitle: () => void;
   hideTitle: () => void;
@@ -161,6 +171,40 @@ function buildSetup(handlers: OverlayHandlers): HTMLElement {
   hint.className = 'hk-setup-hint';
   hint.textContent = 'Cells in the procedural board — smaller is tighter, larger is roomier. Applies to the next board (Regenerate, or the next run if a game is in progress).';
   wrap.append(hint);
+
+  // --- effects quality --------------------------------------------------
+  const qRow = document.createElement('div');
+  qRow.className = 'hk-setup-row';
+  qRow.style.marginTop = '18px';
+  const qLabel = document.createElement('label');
+  qLabel.className = 'hk-setup-label';
+  qLabel.textContent = 'Effects quality';
+  const qAuto = document.createElement('span');
+  qAuto.className = 'hk-setup-val';
+  qRow.append(qLabel, qAuto);
+  const qSeg = document.createElement('div');
+  qSeg.className = 'hk-qseg';
+  const qOpts: Quality[] = ['high', 'medium', 'low', 'off'];
+  const qBtns = new Map<Quality, HTMLButtonElement>();
+  const syncQ = (): void => {
+    const cur = getQuality();
+    for (const [k, b] of qBtns) b.classList.toggle('is-active', k === cur);
+    qAuto.textContent = isAutoQuality() ? 'auto' : 'manual';
+  };
+  for (const opt of qOpts) {
+    const b = document.createElement('button');
+    b.className = 'hk-qbtn';
+    b.textContent = opt;
+    b.addEventListener('click', () => { setQuality(opt, { manual: true }); syncQ(); });
+    qBtns.set(opt, b);
+    qSeg.append(b);
+  }
+  const qHint = document.createElement('div');
+  qHint.className = 'hk-setup-hint';
+  qHint.textContent = 'Glow/bloom on the LED title, nixie score and starburst readouts. Lower it if the UI feels sluggish — it auto-steps down on slow devices until you pick a level.';
+  wrap.append(qRow, qSeg, qHint);
+  onQualityChange(syncQ);
+  syncQ();
   return wrap;
 }
 
@@ -334,11 +378,47 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   // --- HUD (lives / wave / timer) -----------------------------------------
   const hud = el('div', 'hk-hud');
 
+  // --- score (nixie tubes, top-right, during play) ------------------------
+  const scoreBox = el('div', 'hk-score');
+  const scoreCv = document.createElement('canvas');
+  scoreCv.className = 'hk-nixie-canvas';
+  scoreBox.append(scoreCv);
+  const scoreDisp = createDisplay(scoreCv, 'nixie', { text: '0000' });
+
+  /** Render the kills-by-type histogram into `resultHist` from run stats. */
+  const buildHist = (stats: ResultStats): void => {
+    resultHist.innerHTML = '';
+    const rows = Object.entries(stats.killsByType)
+      .map(([key, n]) => ({ def: UNIT_BY_KEY[key], n }))
+      .filter((r): r is { def: UnitDef; n: number } => !!r.def)
+      .sort((a, b) => b.n - a.n);
+    if (!rows.length) return;
+    const max = Math.max(...rows.map((r) => r.n));
+    const head = el('div', 'hk-hist-head', `Enemies defeated · ${stats.kills}`);
+    resultHist.append(head);
+    for (const r of rows) {
+      const row = el('div', 'hk-hist-row');
+      const name = el('div', 'hk-hist-name', r.def.label);
+      const track = el('div', 'hk-hist-track');
+      const bar = el('div', 'hk-hist-bar');
+      bar.style.width = Math.max(6, (r.n / max) * 100) + '%';
+      bar.style.background = `#${(r.def.color >>> 0).toString(16).padStart(6, '0')}`;
+      track.append(bar);
+      const num = el('div', 'hk-hist-num', String(r.n));
+      row.append(name, track, num);
+      resultHist.append(row);
+    }
+  };
+
   // --- win / lose result screen -------------------------------------------
   const result = el('div', 'hk-result');
   const resultInner = el('div', 'hk-result-inner');
-  const resultTitle = el('div', 'hk-result-title');
+  const resultTitle = el('div', 'hk-result-title'); // houses the starburst canvas
+  const resultTitleCv = document.createElement('canvas');
+  resultTitleCv.className = 'hk-seg-canvas';
+  resultTitle.append(resultTitleCv);
   const resultSub = el('div', 'hk-result-sub');
+  const resultHist = el('div', 'hk-hist'); // kills-by-type histogram
   const resultActions = el('div', 'hk-result-actions');
   const resultContinue = el('button', 'hk-btn', 'Continue →');
   resultContinue.addEventListener('click', () => handlers.onContinue?.());
@@ -347,20 +427,32 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const resultRules = el('button', 'hk-btn hk-btn-ghost', '☰ Rules');
   resultRules.addEventListener('click', () => openPanelTo('rules'));
   resultActions.append(resultContinue, resultBtn, resultRules);
-  resultInner.append(resultTitle, resultSub, resultActions);
+  resultInner.append(resultTitle, resultSub, resultHist, resultActions);
   result.append(resultInner);
+  const resultTitleDisp = createDisplay(resultTitleCv, 'starburst', { text: 'GAME OVER' });
 
   // --- attract / title screen (shown over the autoplaying demo) -----------
   const titleScreen = el('div', 'hk-title');
   const titleInner = el('div', 'hk-title-inner');
   const titleName = el('div', 'hk-title-name');
-  titleName.innerHTML = '<span class="hk-kanji">綻</span> HokorobiTawaa <span class="hk-kanji">塔</span>';
-  const titleTag = el('div', 'hk-title-tag', 'procedural wireframe tower defense');
-  const playBtn = el('button', 'hk-play', '▶ PLAY');
+  const titleCv = document.createElement('canvas');
+  titleCv.className = 'hk-dm-canvas hk-dm-title';
+  titleName.append(titleCv);
+  const titleTag = el('div', 'hk-title-tag');
+  const subCv = document.createElement('canvas');
+  subCv.className = 'hk-dm-canvas hk-dm-sub';
+  titleTag.append(subCv);
+  const playBtn = el('button', 'hk-play');
+  const playCv = document.createElement('canvas');
+  playCv.className = 'hk-dm-canvas hk-dm-play';
+  playBtn.append(playCv);
   playBtn.addEventListener('click', () => handlers.onPlay());
   const titleDemo = el('div', 'hk-title-demo', '· demo running ·');
   titleInner.append(titleName, titleTag, playBtn, titleDemo);
   titleScreen.append(titleInner);
+  const titleDisp = createDisplay(titleCv, 'dotmatrix', { text: '綻Hokorobi塔', params: { rasterH: 18, bloomBlur: 9, bloomInt: 42, coreWhite: 55, coreSize: 34 } });
+  const subDisp = createDisplay(subCv, 'dotmatrix', { text: 'Procedural Stalberg Grid Tower Defense' });
+  const playDisp = createDisplay(playCv, 'dotmatrix', { text: '▶︎Play' });
 
   // --- radial menu (tower placement / actions, positioned at the tap) ------
   const radial = el('div', 'hk-radial');
@@ -420,7 +512,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     for (const { it, btn } of radialButtons) btn.classList.toggle('is-locked', isLocked(it));
   };
 
-  root.append(top, hud, scrim, bottom, sheet, result, titleScreen, radial);
+  root.append(top, hud, scoreBox, scrim, bottom, sheet, result, titleScreen, radial);
 
   // Deep-link: #rules / #towers / #enemies / #log opens the panel to that tab.
   const hashTab = (): Tab | null => {
@@ -460,21 +552,42 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
         `<span class="hk-wave">W ${data.wave}/${data.totalWaves}</span>` +
         loopTag +
         `<span class="hk-msg">${data.message}</span>`;
+      scoreDisp.setText(String(Math.min(999999, data.score)).padStart(4, '0'));
     },
-    showResult: (won) => {
-      resultTitle.textContent = won ? 'VICTORY' : 'GAME OVER';
+    showResult: (won, stats) => {
+      resultTitleDisp.setText(won ? 'VICTORY' : 'GAME OVER');
       resultTitle.classList.toggle('is-won', won);
-      resultSub.textContent = won
-        ? 'All 12 waves cleared. Continue keeps your towers & gold at higher difficulty.'
-        : 'The base was overrun.';
+      const blurb = won ? 'All 12 waves cleared. Continue for a harder loop.' : 'The base was overrun.';
+      resultSub.textContent = stats ? `${blurb}  ·  Score ${stats.score}` : blurb;
+      if (stats) buildHist(stats); else resultHist.innerHTML = '';
       resultContinue.style.display = won ? '' : 'none';
+      scoreBox.classList.remove('is-on');
+      scoreDisp.setActive(false);
       result.classList.add('is-open');
+      resultTitleDisp.setActive(true);
     },
-    hideResult: () => result.classList.remove('is-open'),
+    hideResult: () => {
+      result.classList.remove('is-open');
+      resultTitleDisp.setActive(false);
+      scoreBox.classList.add('is-on');
+      scoreDisp.setActive(true);
+    },
     showTitle: () => {
       hud.innerHTML = '';
+      scoreBox.classList.remove('is-on');
+      scoreDisp.setActive(false);
       titleScreen.classList.add('is-open');
+      titleDisp.setActive(true);
+      subDisp.setActive(true);
+      playDisp.setActive(true);
     },
-    hideTitle: () => titleScreen.classList.remove('is-open'),
+    hideTitle: () => {
+      titleScreen.classList.remove('is-open');
+      titleDisp.setActive(false);
+      subDisp.setActive(false);
+      playDisp.setActive(false);
+      scoreBox.classList.add('is-on');
+      scoreDisp.setActive(true);
+    },
   };
 }
