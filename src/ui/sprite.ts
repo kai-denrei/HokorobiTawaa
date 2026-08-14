@@ -6,6 +6,7 @@
 
 import { SHAPES } from '../units/shapes';
 import type { UnitDef } from '../units/roster';
+import { intToRgb255 } from '../util/color';
 
 type P3 = [number, number, number];
 
@@ -33,8 +34,8 @@ export function drawSprite(canvas: HTMLCanvasElement, def: UnitDef, size = 88): 
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, size, size);
 
-  const c1 = hexToRgb(def.color);
-  const c2 = def.color2 != null ? hexToRgb(def.color2) : null;
+  const c1 = intToRgb255(def.color);
+  const c2 = def.color2 != null ? intToRgb255(def.color2) : null;
 
   // static orientation (rotX baked as in-game) then a tilted 3/4 view.
   const view = { ay: 0.62, ax: 0.5 };
@@ -64,8 +65,4 @@ export function drawSprite(canvas: HTMLCanvasElement, def: UnitDef, size = 88): 
     ctx.arc(px, py, dot * (0.75 + 0.35 * depth), 0, Math.PI * 2);
     ctx.fill();
   }
-}
-
-function hexToRgb(hex: number): [number, number, number] {
-  return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
 }

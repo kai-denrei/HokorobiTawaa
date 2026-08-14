@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { SHAPES } from './shapes';
 import type { UnitDef, Idle } from './roster';
 import { UP_DAMAGE, UP_RANGE, UP_RATE } from './roster';
+import { intToRgb01 } from '../util/color';
 
 /** Towers animate by upgrade tier: 0 = static, 1 = spin, 2 = twist. Cheap — a
  * spin is an O(1) transform; a twist rewrites the (small) point buffer/frame. */
@@ -106,10 +107,6 @@ function bakeRotX(src: Float32Array, rot: number): Float32Array {
   return out;
 }
 
-function hexToRgb(h: number): [number, number, number] {
-  return [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
-}
-
 /** Fisher–Yates over point triples so truncating the draw range thins the cloud
  * uniformly (HP-as-density) rather than eroding one structured region. */
 function shuffleTriples(a: Float32Array): void {
@@ -167,8 +164,8 @@ export class Unit {
 
     // per-vertex colours (supports dual-code via def.color2)
     const col = new Float32Array(this.count * 3);
-    const c1 = hexToRgb(def.color);
-    const c2 = def.color2 != null ? hexToRgb(def.color2) : null;
+    const c1 = intToRgb01(def.color);
+    const c2 = def.color2 != null ? intToRgb01(def.color2) : null;
     for (let i = 0; i < this.count; i++) {
       const c = c2 && i % 3 === 0 ? c2 : c1;
       col[i * 3] = c[0];
