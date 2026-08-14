@@ -9,6 +9,8 @@
 // mounts float their dots/segments over the scene (no opaque backdrop).
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { hexStrToRgb255 } from '../util/color';
+
 type P = Record<string, any>;
 type Rng = { seed: number; rand: () => number; hash: (x: number, y: number) => number };
 
@@ -33,11 +35,7 @@ function makeRng(seed: number): Rng {
 }
 
 // --- core/color -------------------------------------------------------------
-function hex2rgb(h: string): number[] {
-  let s = String(h).replace('#', '');
-  if (s.length === 3) s = s.split('').map((c) => c + c).join('');
-  return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
-}
+const hex2rgb = hexStrToRgb255; // shared hex-string → [r,g,b] 0..255
 const mix = (a: number[], b: number[], t: number): number[] => a.map((v, i) => Math.round(v + (b[i]! - v) * t));
 const rgba = (c: number[], a: number): string => `rgba(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0},${a})`;
 
