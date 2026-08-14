@@ -2,6 +2,36 @@
 
 Newest first. Surfaced in-app via the version badge → Dev Log tab.
 
+## 2026-08-14 — Progression, multi-path, unit reskins, effects
+
+- **Rules panel** gained **Towers** and **Enemies** galleries (dotted
+  point-cloud sprites drawn to 2D canvas + stat chips) and a **Setup** tab with
+  a maze-size slider (120–320 cells, applies to the next board). The panel now
+  sits above the title/PLAY and result screens, so it's readable any time —
+  including a **Rules** button on the Game Over screen. Deep-links:
+  `#log/#rules/#towers/#enemies/#setup`.
+- **Fewer walls**: buildable band 2→3 hops and mountain scatter 18%→7% for a
+  roomier playfield.
+- **Multi-path**: the single alternate route became `Board.altPaths` (0–2). A
+  second path now opens after **wave 6** and a third after **wave 9**
+  (best-effort — skipped if the board can't fit a distinct corridor). Enemies
+  pick uniformly among the main path and any open alternates.
+- **Continue / loop**: clearing wave 12 shows VICTORY + **Continue →** — same
+  board, towers and gold kept, lives refilled, another 12 waves with enemy HP
+  ×1.6 per loop. HUD shows the loop tag.
+- **Unit reskins** (ported from Braille Fun Shapes / Primitives, colours kept):
+  Agile Swarm → **Bacteriophage**, Nautilus Shell → **Coronavirus**, Drifter
+  UFO → **Wave Saturn**, Torus-Knot boss → **Solving Torus** (new `solving`
+  idle: a Rubik band-turn engine ported as a per-point animation). The Spread
+  tower is now a static **Dodecahedron**; the Slow tower a smaller triangle-base
+  **tetrahedron**.
+- **Effects**: the Slow tower is now an **area lightning field** — each shot
+  tethers a jagged bolt from the tower to every enemy in range and slows them
+  all. The **Sniper** round is stronger (45→62) and slower (2.4→1.9) with a
+  fatter, longer bullet-streak tracer.
+- **PC quick-upgrade**: with a tower selected, **W** or **↑** buys its next
+  upgrade tier.
+
 ## 2026-08-14 — Cache-busting fixed + version glyphs
 
 - Root cause of stale builds (old towers on the live site): the build token was
