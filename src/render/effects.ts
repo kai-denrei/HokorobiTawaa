@@ -44,6 +44,8 @@ export class EffectsSystem {
   private effects: { line: THREE.Line; mat: THREE.LineBasicMaterial; ttl: number; max: number }[] = [];
   private rings: { mesh: THREE.LineLoop; mat: THREE.LineBasicMaterial; ttl: number; max: number; maxScale: number }[] = [];
   private tmp = new THREE.Vector3();
+  // reusable scratch for spawnLightning's basis + point walk (no per-bolt allocs)
+  private lt = { dir: new THREE.Vector3(), up: new THREE.Vector3(), n1: new THREE.Vector3(), n2: new THREE.Vector3(), p: new THREE.Vector3() };
 
   constructor(
     private group: THREE.Group,
@@ -121,29 +123,32 @@ export class EffectsSystem {
     if (hit) this.spawnBurst(from, 5, { speed: 0.2, up: 0.04, size: 0.035, color, ttl: 0.12, gravity: 0 }); // emitter flash
   }
 
-  /** A jagged lightning bolt (fading additive line) from the tower to a target. */
+  /** A jagged lightning bolt (fading additive line) from the tower to a target.
+   * Uses reusable scratch vectors + a flat position array (no per-bolt allocs
+   * beyond the geometry itself) since slow-field fire can spawn many per frame. */
   private spawnLightning(from: THREE.Vector3, to: THREE.Vector3, color: THREE.Color): void {
-    const dir = new THREE.Vector3().subVectors(to, from);
+    const s = this.lt;
+    const dir = s.dir.subVectors(to, from);
     const len = dir.length() || 1;
     dir.multiplyScalar(1 / len);
-    const up = new THREE.Vector3(0, 1, 0);
-    let n1 = new THREE.Vector3().crossVectors(dir, up);
+    const n1 = s.n1.crossVectors(dir, s.up.set(0, 1, 0));
     if (n1.lengthSq() < 1e-6) n1.set(1, 0, 0);
     n1.normalize();
-    const n2 = new THREE.Vector3().crossVectors(dir, n1).normalize();
+    const n2 = s.n2.crossVectors(dir, n1).normalize();
     const seg = 7;
     const amp = 0.06 * len;
-    const pts: THREE.Vector3[] = [];
+    const pos: number[] = [];
     for (let i = 0; i <= seg; i++) {
       const f = i / seg;
-      const p = from.clone().addScaledVector(dir, len * f);
+      const p = s.p.copy(from).addScaledVector(dir, len * f);
       if (i > 0 && i < seg) {
         p.addScaledVector(n1, (Math.random() - 0.5) * amp);
         p.addScaledVector(n2, (Math.random() - 0.5) * amp);
       }
-      pts.push(p);
+      pos.push(p.x, p.y, p.z);
     }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
     const line = new THREE.Line(geo, mat);
     this.group.add(line);

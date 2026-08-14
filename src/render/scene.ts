@@ -25,6 +25,15 @@ export type MountainStyle = 'wire' | 'solid';
 
 // Projectiles + transient FX live in ./effects (EffectsSystem).
 
+// Memoized projectile tints (immutable — only read, or cloned by spawnBurst) so
+// stepCombat doesn't allocate a THREE.Color on every shot.
+const projColorCache = new Map<number, THREE.Color>();
+function projColor(hex: number): THREE.Color {
+  let c = projColorCache.get(hex);
+  if (!c) { c = new THREE.Color(hex); projColorCache.set(hex, c); }
+  return c;
+}
+
 // Pure coordinate + block-geometry helpers live in ./coords (unit-tested).
 
 export type PickHandler = (cellId: number | null, cell: Cell | null) => void;
@@ -448,7 +457,7 @@ export class BoardView {
       if (best) {
         t.cooldown = 1 / rate;
         const atk = t.def.attack ?? 'single';
-        const color = new THREE.Color(t.def.projColor ?? t.def.color);
+        const color = projColor(t.def.projColor ?? t.def.color);
         const size = t.def.projSize ?? 0.02;
         const trail = t.def.projTrail ?? 0;
         const target = best.object.position;
