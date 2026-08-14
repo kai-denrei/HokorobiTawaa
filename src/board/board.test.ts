@@ -72,6 +72,27 @@ describe('board generation', () => {
     }
   });
 
+  it('generates 0–2 alternate routes, each a distinct valid corridor', () => {
+    for (const b of boards()) {
+      expect(b.altPaths.length).toBeGreaterThanOrEqual(0);
+      expect(b.altPaths.length).toBeLessThanOrEqual(2);
+      const mainInterior = new Set(b.path.slice(1, -1));
+      for (const alt of b.altPaths) {
+        expect(alt[0]).toBe(b.spawns[0]);
+        expect(alt[alt.length - 1]).toBe(b.base);
+        expect(alt.length).toBeGreaterThanOrEqual(4);
+        for (let i = 1; i < alt.length; i++) {
+          expect(b.cells.get(alt[i - 1]!)!.neighbors).toContain(alt[i]!);
+        }
+        for (const id of alt.slice(1, -1)) expect(mainInterior.has(id)).toBe(false);
+      }
+      if (b.altPaths.length === 2) {
+        const a0 = new Set(b.altPaths[0]!.slice(1, -1));
+        for (const id of b.altPaths[1]!.slice(1, -1)) expect(a0.has(id)).toBe(false);
+      }
+    }
+  });
+
   it('is deterministic: same seed => identical board', () => {
     for (const s of SEEDS) {
       const a = generateBoard(s, { targetCells: 120 });

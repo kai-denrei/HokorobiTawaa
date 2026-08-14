@@ -498,6 +498,106 @@ function ufoPts(): P[] {
   return fitUnit(pts);
 }
 
+// coronavirus — a fuzzy shell studded with club-shaped spikes tipped by knobs.
+// Ported from Braille "Fun Shapes" (coronaPts).
+function coronaPts(): P[] {
+  const pts: P[] = [];
+  const R = 0.5;
+  const nSpk = 44;
+  for (let i = 0; i < 320; i++) {
+    const d = fibDir(i, 320);
+    pts.push([d[0]! * R, d[1]! * R, d[2]! * R]);
+  }
+  for (let k = 0; k < nSpk; k++) {
+    const d = fibDir(k, nSpk);
+    for (let s = 1; s <= 3; s++) {
+      const r = R + (s / 3) * 0.28; // stalk
+      pts.push([d[0]! * r, d[1]! * r, d[2]! * r]);
+    }
+    const tip = R + 0.34;
+    for (let j = 0; j < 6; j++) {
+      const e = fibDir(j, 6); // knob pops
+      pts.push([d[0]! * tip + e[0]! * 0.07, d[1]! * tip + e[1]! * 0.07, d[2]! * tip + e[2]! * 0.07]);
+    }
+  }
+  return fitUnit(pts);
+}
+
+// bacteriophage — the "lunar lander": icosahedral head, tail sheath, leg fibers.
+// Ported from Braille "Fun Shapes" (phagePts).
+function phagePts(): P[] {
+  const pts: P[] = [];
+  const hy = 0.5;
+  const hR = 0.4;
+  const tailTop = 0.1;
+  const tailBot = -0.35;
+  const tr = 0.1;
+  for (let i = 0; i < 200; i++) {
+    const d = fibDir(i, 200); // head capsid
+    pts.push([d[0]! * hR, hy + d[1]! * hR, d[2]! * hR]);
+  }
+  for (let iy = 0; iy <= 14; iy++) {
+    const y = tailTop + ((tailBot - tailTop) * iy) / 14; // tail sheath
+    for (let a = 0; a < 10; a++) {
+      const ang = (a / 10) * 2 * Math.PI;
+      pts.push([tr * Math.cos(ang), y, tr * Math.sin(ang)]);
+    }
+  }
+  for (let i = 0; i < 30; i++) {
+    const a = (i / 30) * 2 * Math.PI; // baseplate
+    for (const rr of [0.12, 0.2]) pts.push([rr * Math.cos(a), tailBot, rr * Math.sin(a)]);
+  }
+  for (let k = 0; k < 6; k++) {
+    const ang = (k / 6) * 2 * Math.PI;
+    const cx = Math.cos(ang);
+    const cz = Math.sin(ang);
+    const hip: P = [0.14 * cx, tailBot, 0.14 * cz];
+    const knee: P = [0.2 * cx, tailBot - 0.05, 0.2 * cz];
+    const foot: P = [0.5 * cx, -0.9, 0.5 * cz];
+    for (const [A, B] of [[hip, knee], [knee, foot]] as [P, P][]) {
+      for (let s = 0; s <= 6; s++) {
+        const f = s / 6; // leg fibers
+        pts.push([A[0]! + (B[0]! - A[0]!) * f, A[1]! + (B[1]! - A[1]!) * f, A[2]! + (B[2]! - A[2]!) * f]);
+      }
+    }
+  }
+  return fitUnit(pts);
+}
+
+// saturn — a sphere planet girdled by a flat multi-ring band.
+// Ported from Braille "Fun Shapes" (saturnPts).
+function saturnPts(): P[] {
+  const pts: P[] = [];
+  for (let i = 0; i < 440; i++) {
+    const d = fibDir(i, 440);
+    pts.push([d[0]! * 0.62, d[1]! * 0.62, d[2]! * 0.62]);
+  }
+  for (let i = 0; i < 230; i++) {
+    const a = (i / 230) * 2 * Math.PI;
+    for (const rr of [0.95, 1.03, 1.11, 1.19]) pts.push([rr * Math.cos(a), 0, rr * Math.sin(a)]);
+  }
+  return fitUnit(pts);
+}
+
+// torus — a closed donut surface (u = around the ring, v = around the tube).
+// Ported from Braille "Primitives" (TOR_PTS). Animated by the 'solving' idle.
+function torusPts(): P[] {
+  const R = 1;
+  const r = 0.42;
+  const torPoint = (u: number, v: number): P => {
+    const rr = R + r * Math.cos(v);
+    return [rr * Math.cos(u), rr * Math.sin(u), r * Math.sin(v)];
+  };
+  const pts: P[] = [];
+  const N = 42;
+  const M = 12;
+  for (let i = 0; i < N; i++) {
+    const u = (i / N) * 2 * Math.PI;
+    for (let j = 0; j < M; j++) pts.push(torPoint(u, (j / M) * 2 * Math.PI));
+  }
+  return fitUnit(pts);
+}
+
 export type ShapeDef = {
   key: string;
   label: string;
@@ -534,4 +634,8 @@ export const SHAPES: Record<string, ShapeDef> = {
   slime: toShape('slime', 'Slime', slimePts()),
   seamine: toShape('seamine', 'Sea Mine', seaminePts()),
   ufo: toShape('ufo', 'UFO', ufoPts()),
+  corona: toShape('corona', 'Coronavirus', coronaPts()),
+  phage: toShape('phage', 'Bacteriophage', phagePts()),
+  saturn: toShape('saturn', 'Saturn', saturnPts()),
+  torus: toShape('torus', 'Torus', torusPts()),
 };

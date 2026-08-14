@@ -30,7 +30,9 @@ export type Board = {
   base: CellId;
   /** Ordered fixed route spawn → base (inclusive), all terrain 'path'. */
   path: CellId[];
-  /** Optional alternate route spawn → base, initially closed (blocked terrain);
-   * opens mid-game so enemies pick path or path2 at random. */
-  path2?: CellId[];
+  /** Alternate spawn → base routes (0–2), initially closed (blocked terrain);
+   * opened one at a time mid-game (waves 6 & 9). Once open, enemies pick the
+   * main path or any open alternate at random. Empty when the board can't fit
+   * a distinct alternate corridor. */
+  altPaths: CellId[][];
 };

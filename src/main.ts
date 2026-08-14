@@ -1,6 +1,6 @@
 import './ui/styles.css';
 import { BoardView } from './render/scene';
-import { createOverlay, type RadialItem } from './ui/overlay';
+import { createOverlay, BOARD_SIZE, type RadialItem } from './ui/overlay';
 import { generateBoard, type Board } from './board';
 import { TOWERS, ENEMIES } from './units/roster';
 import { Game } from './game/game';
@@ -10,7 +10,9 @@ const app = document.getElementById('app') as HTMLElement;
 
 const view = new BoardView(canvas);
 let seed = (Math.random() * 0x7fffffff) | 0;
+let boardSize = BOARD_SIZE.default; // maze target-cell count (Setup slider)
 let board: Board;
+let selectedTower: number | null = null; // last-tapped tower cell (W / ↑ upgrades it)
 
 type Mode = 'attract' | 'play';
 let mode: Mode = 'attract';
@@ -26,6 +28,17 @@ const overlay = createOverlay(app, {
   },
   onToggleMountains: (style) => view.setMountainStyle(style),
   onPlay: () => startPlay(),
+  onBoardSize: (n) => {
+    boardSize = n;
+    // Regenerate immediately only in attract mode; a live run keeps its board
+    // and picks up the new size on the next Regenerate / new run.
+    if (mode === 'attract') startAttract();
+    else overlay.setCellInfo(`Maze size ${n} — applies on next Regenerate.`);
+  },
+  onContinue: () => {
+    overlay.hideResult();
+    game.continueRun();
+  },
 });
 
 const game = new Game(view, {
@@ -35,7 +48,7 @@ const game = new Game(view, {
     overlay.refreshRadial(); // gold changed → update affordability of an open menu
   },
   onResult: (status) => overlay.showResult(status === 'won'),
-  onOpenSecondPath: () => view.openSecondPath(),
+  onOpenPath: (index) => view.openPath(index),
 });
 
 view.onTick = (dt) => {
@@ -80,10 +93,26 @@ function openPlaceRadial(cellId: number, x: number, y: number): void {
   });
 }
 
+/** Buy one upgrade tier for the tower on `cellId`, if affordable. Shared by the
+ * radial menu and the keyboard shortcut. Returns whether it upgraded. */
+function upgradeTowerAt(cellId: number): boolean {
+  const inf = view.towerInfo(cellId);
+  if (!inf || inf.nextCost == null) return false;
+  if (!game.spend(inf.nextCost)) {
+    overlay.setCellInfo('not enough gold');
+    return false;
+  }
+  view.upgradeTower(cellId, inf.nextCost);
+  const after = view.towerInfo(cellId);
+  if (after) view.showRange(cellId, after.range, after.color, 1.8);
+  return true;
+}
+
 // Radial menu for an existing tower: Upgrade / Sell, with its range shown.
 function openTowerRadial(cellId: number, x: number, y: number): void {
   const info = view.towerInfo(cellId);
   if (!info) return;
+  selectedTower = cellId; // remember it for the W / ↑ upgrade shortcut
   view.showRange(cellId, info.range, info.color, 3);
   const items: RadialItem[] = [];
   if (info.nextCost != null) {
@@ -101,14 +130,13 @@ function openTowerRadial(cellId: number, x: number, y: number): void {
     onPick: (key) => {
       const inf = view.towerInfo(cellId);
       if (!inf) return;
-      if (key === 'upgrade' && inf.nextCost != null && game.spend(inf.nextCost)) {
-        view.upgradeTower(cellId, inf.nextCost);
-        const after = view.towerInfo(cellId);
-        if (after) view.showRange(cellId, after.range, after.color, 1.8);
+      if (key === 'upgrade') {
+        upgradeTowerAt(cellId);
       } else if (key === 'sell') {
         view.sellTower(cellId);
         game.addGold(inf.sellValue);
         view.hideRange();
+        selectedTower = null;
       }
     },
   });
@@ -160,7 +188,7 @@ function startAttract(): void {
   mode = 'attract';
   overlay.closePalette();
   overlay.hideResult();
-  board = generateBoard(seed, { targetCells: 210 });
+  board = generateBoard(seed, { targetCells: boardSize });
   view.setBoard(board);
   view.highlightCell(null);
   setSeedInfo();
@@ -184,7 +212,7 @@ function newPlayBoard(): void {
   overlay.closePalette();
   overlay.hideResult();
   overlay.hideTitle();
-  board = generateBoard(seed, { targetCells: 210 });
+  board = generateBoard(seed, { targetCells: boardSize });
   view.setBoard(board);
   view.highlightCell(null);
   setSeedInfo();
@@ -213,16 +241,33 @@ canvas.addEventListener('pointerup', (e) => {
   if (!hit) {
     overlay.setCellInfo('— no cell there —');
     overlay.closeRadial();
+    selectedTower = null;
     return;
   }
   const c = hit.cell;
   if (c.terrain === 'buildable') {
     if (view.hasTower(c.id)) openTowerRadial(c.id, e.clientX, e.clientY);
-    else openPlaceRadial(c.id, e.clientX, e.clientY);
+    else {
+      selectedTower = null;
+      openPlaceRadial(c.id, e.clientX, e.clientY);
+    }
   } else {
     overlay.setCellInfo(`cell #${c.id} · ${c.terrain}`);
     overlay.closeRadial();
+    selectedTower = null;
   }
+});
+
+// PC quick-upgrade: with a tower selected (tapped), W or ↑ buys the next tier.
+window.addEventListener('keydown', (e) => {
+  if (mode !== 'play') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; // don't hijack the size slider
+  if (e.key !== 'w' && e.key !== 'W' && e.key !== 'ArrowUp') return;
+  if (selectedTower == null || !view.hasTower(selectedTower)) return;
+  e.preventDefault();
+  upgradeTowerAt(selectedTower);
 });
 
 // --- dev/test hook: drive spawns from the console or a smoke test ---------
@@ -234,8 +279,8 @@ canvas.addEventListener('pointerup', (e) => {
     game.leak();
     view.hitBase();
   },
-  openPath: () => view.openSecondPath(),
-  hasPath2: () => !!board.path2,
+  openPath: (i = 0) => view.openPath(i),
+  altPathCount: () => board.altPaths.length,
   get board() {
     return board;
   },

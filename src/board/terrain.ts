@@ -23,8 +23,8 @@ export type TerrainParams = {
 };
 
 const DEFAULTS: Required<TerrainParams> = {
-  buildableRadius: 2,
-  mountainFraction: 0.18,
+  buildableRadius: 3,
+  mountainFraction: 0.07,
 };
 
 /**
@@ -75,20 +75,26 @@ export function typeTerrain(
     if (rng() < mountainFraction) cells.get(id)!.terrain = 'blocked';
   }
 
-  // Alternate route (initially closed): a different spawn→base path that avoids
-  // path1's interior. Its interior cells are forced to 'blocked' (a wall ridge)
-  // until the game opens it mid-run.
+  // Alternate routes (initially closed): up to two more spawn→base paths, each
+  // avoiding the interiors of the main path and any earlier alternate. Their
+  // interior cells are forced to 'blocked' (wall ridges) until the game opens
+  // them one at a time mid-run (waves 6 & 9). Best-effort — a small/thin board
+  // may yield fewer than two, which is fine.
+  const altPaths: CellId[][] = [];
   const avoid = new Set(path.slice(1, -1));
-  const alt = bfsPath(cells, spawn, base, avoid);
-  let path2: CellId[] | undefined;
-  if (alt && alt.length >= 4) {
-    for (const id of alt.slice(1, -1)) cells.get(id)!.terrain = 'blocked';
-    path2 = alt;
+  for (let k = 0; k < 2; k++) {
+    const alt = bfsPath(cells, spawn, base, avoid);
+    if (!alt || alt.length < 4) break;
+    for (const id of alt.slice(1, -1)) {
+      cells.get(id)!.terrain = 'blocked';
+      avoid.add(id); // keep the next alternate distinct from this one
+    }
+    altPaths.push(alt);
   }
 
   // spawn/base overwrite their path endpoints
   cells.get(spawn)!.terrain = 'spawn';
   cells.get(base)!.terrain = 'base';
 
-  return { cells, seed, spawns: [spawn], base, path, path2 };
+  return { cells, seed, spawns: [spawn], base, path, altPaths };
 }

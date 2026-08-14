@@ -15,6 +15,7 @@ export type HudState = {
   mult: number;
   wave: number; // 1-based; 0 before the first wave
   totalWaves: number;
+  loop: number; // 1-based; increments each Continue
   status: GameStatus;
   message: string;
 };
@@ -22,7 +23,9 @@ export type HudState = {
 export type GameCallbacks = {
   onHud: (s: HudState) => void;
   onResult: (status: 'won' | 'lost') => void;
-  onOpenSecondPath?: () => void;
+  /** Open alternate route `index` (0 after wave 6, 1 after wave 9). No-op in
+   * the view if the board has no such alternate. */
+  onOpenPath?: (index: number) => void;
 };
 
 type SpawnGroup = { key: string; count: number; interval: number };
@@ -35,8 +38,14 @@ const BETWEEN_DELAY = 6; // seconds between waves
 /** Per-wave HP multiplier, applied to base enemy HP. */
 const HP_SCALE = [1.0, 1.1, 1.2, 1.32, 1.44, 1.56, 1.7, 1.9, 2.1, 2.35, 2.6, 3.0];
 
-/** After this wave (1-based) clears, the second path opens. */
-const OPEN_PATH_AFTER_WAVE = 8;
+/** Global HP multiplier compounded once per completed loop (Continue). */
+const LOOP_HP_MULT = 1.6;
+
+/** After wave `N` (1-based) clears, open alternate route `index`. */
+const PATH_OPENINGS: { afterWave: number; index: number }[] = [
+  { afterWave: 6, index: 0 },
+  { afterWave: 9, index: 1 },
+];
 
 /** Escalating waves that introduce the new behaviours in turn. */
 function buildWaves(): Wave[] {
@@ -46,11 +55,10 @@ function buildWaves(): Wave[] {
     [{ key: 'scoutufo', count: 8, interval: 0.55 }, { key: 'gslime', count: 3, interval: 1.2 }], // healers arrive
     [{ key: 'bslime', count: 2, interval: 1.4 }, { key: 'butterfly', count: 12, interval: 0.35 }, { key: 'drifter', count: 3, interval: 0.9 }], // aura + erratic
     [{ key: 'shell', count: 6, interval: 0.7 }, { key: 'gslime', count: 4, interval: 1.0 }], // armored + healers
-    [{ key: 'barbed', count: 4, interval: 1.1 }, { key: 'scoutufo', count: 6, interval: 0.5 }], // accel-on-hit
+    [{ key: 'barbed', count: 4, interval: 1.1 }, { key: 'scoutufo', count: 6, interval: 0.5 }], // wave 6 — alt path 0 opens after
     [{ key: 'cloud', count: 3, interval: 1.3 }, { key: 'rolling', count: 2, interval: 1.8 }, { key: 'ghost', count: 6, interval: 0.6 }], // epic tanks
-    [{ key: 'knot', count: 2, interval: 1.9 }, { key: 'prime', count: 1, interval: 1 }, { key: 'barbed', count: 3, interval: 1.2 }, { key: 'bslime', count: 2, interval: 1.4 }], // wave 8 — second path opens after
-    // --- two-path phase ---
-    [{ key: 'drifter', count: 4, interval: 0.8 }, { key: 'barbed', count: 4, interval: 1.0 }],
+    [{ key: 'knot', count: 2, interval: 1.9 }, { key: 'prime', count: 1, interval: 1 }, { key: 'barbed', count: 3, interval: 1.2 }, { key: 'bslime', count: 2, interval: 1.4 }],
+    [{ key: 'drifter', count: 4, interval: 0.8 }, { key: 'barbed', count: 4, interval: 1.0 }], // wave 9 — alt path 1 opens after
     [{ key: 'scoutufo', count: 8, interval: 0.4 }, { key: 'gslime', count: 5, interval: 0.9 }, { key: 'rolling', count: 3, interval: 1.6 }],
     [{ key: 'prime', count: 2, interval: 1.8 }, { key: 'cloud', count: 4, interval: 1.1 }, { key: 'bslime', count: 3, interval: 1.2 }],
     [{ key: 'knot', count: 3, interval: 1.6 }, { key: 'prime', count: 2, interval: 1.8 }, { key: 'barbed', count: 4, interval: 1.0 }, { key: 'rolling', count: 2, interval: 1.7 }], // finale
@@ -63,6 +71,7 @@ export class Game {
   private gold = START_GOLD;
   private streak = 0;
   private waveIndex = -1;
+  private loop = 1;
   private status: GameStatus = 'ready';
   private countdown = START_DELAY;
 
@@ -77,15 +86,34 @@ export class Game {
     private readonly cb: GameCallbacks,
   ) {}
 
-  /** Re-arm for a fresh board. */
+  /** Re-arm for a fresh board (new run: loop 1, full economy reset). */
   reset(): void {
     this.waves = buildWaves();
     this.lives = START_LIVES;
     this.gold = START_GOLD;
     this.streak = 0;
     this.waveIndex = -1;
+    this.loop = 1;
     this.status = 'ready';
     this.countdown = START_DELAY;
+    this.groupIndex = 0;
+    this.spawnedInGroup = 0;
+    this.spawnTimer = 0;
+    this.spawningDone = false;
+    this.emitHud();
+  }
+
+  /** Continue after a victory: next 12-wave loop on the SAME board. Keeps gold
+   * and all placed towers, refills lives, and compounds enemy HP by
+   * LOOP_HP_MULT. Alternate paths opened earlier stay open. */
+  continueRun(): void {
+    if (this.status !== 'won') return;
+    this.loop++;
+    this.lives = START_LIVES;
+    this.streak = 0;
+    this.waveIndex = -1;
+    this.status = 'ready';
+    this.countdown = BETWEEN_DELAY;
     this.groupIndex = 0;
     this.spawnedInGroup = 0;
     this.spawnTimer = 0;
@@ -157,7 +185,10 @@ export class Game {
       } else {
         this.status = 'ready';
         this.countdown = BETWEEN_DELAY;
-        if (this.waveIndex + 1 === OPEN_PATH_AFTER_WAVE) this.cb.onOpenSecondPath?.();
+        const justCleared = this.waveIndex + 1; // 1-based
+        for (const o of PATH_OPENINGS) {
+          if (o.afterWave === justCleared) this.cb.onOpenPath?.(o.index);
+        }
       }
     }
     this.emitHud();
@@ -180,7 +211,8 @@ export class Game {
     let guard = 0;
     while (!this.spawningDone && this.spawnTimer <= 0 && guard++ < 64) {
       const group = wave[this.groupIndex]!;
-      this.view.spawnEnemy(group.key, HP_SCALE[this.waveIndex] ?? 1);
+      const hp = (HP_SCALE[this.waveIndex] ?? 1) * LOOP_HP_MULT ** (this.loop - 1);
+      this.view.spawnEnemy(group.key, hp);
       this.spawnedInGroup++;
       this.spawnTimer += group.interval;
       if (this.spawnedInGroup >= group.count) {
@@ -210,6 +242,7 @@ export class Game {
       mult: this.multiplier(),
       wave: Math.max(0, this.waveIndex + 1),
       totalWaves: this.waves.length,
+      loop: this.loop,
       status: this.status,
       message,
     });

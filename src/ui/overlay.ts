@@ -28,6 +28,7 @@ export type HudData = {
   mult: number;
   wave: number;
   totalWaves: number;
+  loop: number;
   message: string;
   status: string;
 };
@@ -60,6 +61,10 @@ export type OverlayHandlers = {
   onRegenerate: () => void;
   onToggleMountains: (style: 'wire' | 'solid') => void;
   onPlay: () => void;
+  /** Maze target-cell count changed (applied on release). */
+  onBoardSize?: (cells: number) => void;
+  /** Continue after a victory into the next, harder loop. */
+  onContinue?: () => void;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -125,6 +130,40 @@ function buildGallery(units: UnitDef[]): HTMLElement {
   return grid;
 }
 
+/** Board size (min/default/max target-cell counts) for the maze slider. */
+export const BOARD_SIZE = { min: 120, max: 320, step: 10, default: 210 };
+
+/** "Setup" tab: the maze-size slider (applies on release). */
+function buildSetup(handlers: OverlayHandlers): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'hk-setup';
+  const row = document.createElement('div');
+  row.className = 'hk-setup-row';
+  const label = document.createElement('label');
+  label.className = 'hk-setup-label';
+  label.textContent = 'Maze size';
+  const val = document.createElement('span');
+  val.className = 'hk-setup-val';
+  val.textContent = String(BOARD_SIZE.default);
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'hk-slider';
+  slider.min = String(BOARD_SIZE.min);
+  slider.max = String(BOARD_SIZE.max);
+  slider.step = String(BOARD_SIZE.step);
+  slider.value = String(BOARD_SIZE.default);
+  slider.setAttribute('aria-label', 'Maze size (cells)');
+  slider.addEventListener('input', () => { val.textContent = slider.value; });
+  slider.addEventListener('change', () => handlers.onBoardSize?.(Number(slider.value)));
+  row.append(label, val);
+  wrap.append(row, slider);
+  const hint = document.createElement('div');
+  hint.className = 'hk-setup-hint';
+  hint.textContent = 'Cells in the procedural board — smaller is tighter, larger is roomier. Applies to the next board (Regenerate, or the next run if a game is in progress).';
+  wrap.append(hint);
+  return wrap;
+}
+
 export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Overlay {
   // --- top bar -------------------------------------------------------------
   const top = el('div', 'hk-top');
@@ -144,19 +183,21 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const tabRules = el('button', 'hk-tab', 'Rules');
   const tabTowers = el('button', 'hk-tab', 'Towers');
   const tabEnemies = el('button', 'hk-tab', 'Enemies');
+  const tabSetup = el('button', 'hk-tab', 'Setup');
   const closeBtn = el('button', 'hk-close', '×');
-  tabs.append(tabLog, tabRules, tabTowers, tabEnemies, closeBtn);
+  tabs.append(tabLog, tabRules, tabTowers, tabEnemies, tabSetup, closeBtn);
   const body = el('div', 'hk-panel-body');
   const meta = el('div', 'hk-panel-meta', `build ${BUILD.token} · ${BUILD.builtAt}`);
   panel.append(tabs, body, meta);
   scrim.append(panel);
 
-  type Tab = 'log' | 'rules' | 'towers' | 'enemies';
+  type Tab = 'log' | 'rules' | 'towers' | 'enemies' | 'setup';
   const tabBtns: Record<Tab, HTMLButtonElement> = {
     log: tabLog,
     rules: tabRules,
     towers: tabTowers,
     enemies: tabEnemies,
+    setup: tabSetup,
   };
   // Content is built lazily and cached (galleries render point-cloud sprites once).
   const content: Partial<Record<Tab, HTMLElement>> = {};
@@ -169,6 +210,8 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     } else if (which === 'rules') {
       node = el('div');
       node.innerHTML = renderMarkdown(rulesRaw);
+    } else if (which === 'setup') {
+      node = buildSetup(handlers);
     } else {
       node = buildGallery(which === 'towers' ? TOWERS : ENEMIES);
     }
@@ -197,6 +240,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   tabRules.addEventListener('click', () => showTab('rules'));
   tabTowers.addEventListener('click', () => showTab('towers'));
   tabEnemies.addEventListener('click', () => showTab('enemies'));
+  tabSetup.addEventListener('click', () => showTab('setup'));
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closePanel();
@@ -296,11 +340,13 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const resultTitle = el('div', 'hk-result-title');
   const resultSub = el('div', 'hk-result-sub');
   const resultActions = el('div', 'hk-result-actions');
-  const resultBtn = el('button', 'hk-btn', '↻ Play again');
+  const resultContinue = el('button', 'hk-btn', 'Continue →');
+  resultContinue.addEventListener('click', () => handlers.onContinue?.());
+  const resultBtn = el('button', 'hk-btn hk-btn-ghost', '↻ Play again');
   resultBtn.addEventListener('click', () => handlers.onRegenerate());
   const resultRules = el('button', 'hk-btn hk-btn-ghost', '☰ Rules');
   resultRules.addEventListener('click', () => openPanelTo('rules'));
-  resultActions.append(resultBtn, resultRules);
+  resultActions.append(resultContinue, resultBtn, resultRules);
   resultInner.append(resultTitle, resultSub, resultActions);
   result.append(resultInner);
 
@@ -379,7 +425,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   // Deep-link: #rules / #towers / #enemies / #log opens the panel to that tab.
   const hashTab = (): Tab | null => {
     const h = location.hash.replace(/^#/, '') as Tab;
-    return (['log', 'rules', 'towers', 'enemies'] as Tab[]).includes(h) ? h : null;
+    return (['log', 'rules', 'towers', 'enemies', 'setup'] as Tab[]).includes(h) ? h : null;
   };
   const applyHash = (): void => {
     const t = hashTab();
@@ -406,17 +452,22 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     closePalette,
     setHud: (data) => {
       const low = data.lives <= 3 ? ' hk-lives-low' : '';
+      const loopTag = data.loop > 1 ? `<span class="hk-loop">L${data.loop}</span>` : '';
       hud.innerHTML =
         `<span class="hk-lives${low}">♥ ${data.lives}</span>` +
         `<span class="hk-gold">◆ ${data.gold}</span>` +
         `<span class="hk-mult">×${data.mult.toFixed(1)}</span>` +
         `<span class="hk-wave">W ${data.wave}/${data.totalWaves}</span>` +
+        loopTag +
         `<span class="hk-msg">${data.message}</span>`;
     },
     showResult: (won) => {
       resultTitle.textContent = won ? 'VICTORY' : 'GAME OVER';
       resultTitle.classList.toggle('is-won', won);
-      resultSub.textContent = won ? 'All waves cleared.' : 'The base was overrun.';
+      resultSub.textContent = won
+        ? 'All 12 waves cleared. Continue keeps your towers & gold at higher difficulty.'
+        : 'The base was overrun.';
+      resultContinue.style.display = won ? '' : 'none';
       result.classList.add('is-open');
     },
     hideResult: () => result.classList.remove('is-open'),

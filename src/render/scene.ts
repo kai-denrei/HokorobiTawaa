@@ -107,8 +107,13 @@ export class BoardView {
   private baseHeart: HeartBase | null = null;
   private rangeRing: THREE.LineLoop | null = null;
   private rangeTTL = 0;
-  private path2Open = false;
-  private path2Points: THREE.Vector3[] = [];
+  /** World-space point lists for each currently-open alternate route. Enemies
+   * pick the main path or any of these at random. */
+  private openAltPaths: THREE.Vector3[][] = [];
+  /** Which alt indices are already open (guards re-opening across loops). */
+  private openedAltIndices = new Set<number>();
+  /** Alt index whose reveal animation is in flight (added once it finishes). */
+  private pendingAltIndex = -1;
   private pathAnim: { group: THREE.Group; t: number } | null = null;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
@@ -191,8 +196,8 @@ export class BoardView {
   /** (Re)build the visible board from a Board data structure. */
   setBoard(board: Board): void {
     this.board = board;
-    this.path2Open = false;
-    this.path2Points = [];
+    this.openAltPaths = [];
+    this.openedAltIndices.clear();
     if (this.pathAnim) {
       this.scene.remove(this.pathAnim.group);
       this.pathAnim = null;
@@ -408,13 +413,16 @@ export class BoardView {
     if (!this.board) return null;
     const def = UNIT_BY_KEY[key];
     if (!def || def.family !== 'enemy') return null;
-    const usePath2 = this.path2Open && this.path2Points.length >= 2 && Math.random() < 0.5;
-    const pts = usePath2
-      ? this.path2Points.map((v) => v.clone())
-      : this.board.path.map((id) => {
-          const w = toWorld(this.board!.cells.get(id)!.center);
-          return new THREE.Vector3(w[0], 0, w[2]);
-        });
+    // Pick uniformly among the main path and any open alternate routes.
+    const routeCount = 1 + this.openAltPaths.length;
+    const routePick = (Math.random() * routeCount) | 0;
+    const pts =
+      routePick > 0 && this.openAltPaths[routePick - 1]
+        ? this.openAltPaths[routePick - 1]!.map((v) => v.clone())
+        : this.board.path.map((id) => {
+            const w = toWorld(this.board!.cells.get(id)!.center);
+            return new THREE.Vector3(w[0], 0, w[2]);
+          });
     if (pts.length < 2) return null;
     const e = new Enemy(def, this.enemyScale, this.units.length, pts, def.speed ?? 0.12, 0, hpScale);
     this.unitsGroup.add(e.object);
@@ -463,15 +471,15 @@ export class BoardView {
     this.baseHeart?.hit();
   }
 
-  get hasSecondPath(): boolean {
-    return !!this.board?.path2 && !this.path2Open && !this.pathAnim;
-  }
-
-  /** Open the alternate route: highlight → flash the raised tiles → they vanish
-   * into a low hallway; afterwards enemies pick path or path2 at random. */
-  openSecondPath(): void {
-    if (!this.board || !this.board.path2 || this.path2Open || this.pathAnim) return;
-    const interior = this.board.path2.slice(1, -1);
+  /** Open alternate route `index` (0 or 1): highlight → flash the raised tiles →
+   * they vanish into a low hallway; afterwards enemies may walk it. Idempotent
+   * and a no-op if the board has no such alternate or an animation is running. */
+  openPath(index: number): void {
+    const alt = this.board?.altPaths[index];
+    if (!this.board || !alt || this.openedAltIndices.has(index) || this.pathAnim) return;
+    this.openedAltIndices.add(index);
+    this.pendingAltIndex = index;
+    const interior = alt.slice(1, -1);
     for (const id of interior) {
       const c = this.board.cells.get(id);
       if (c) c.terrain = 'path'; // data now; visuals swap when the anim ends
@@ -518,11 +526,16 @@ export class BoardView {
       this.pathAnim = null;
       this.clearGroup();
       this.buildTerrain(); // opening cells are now low 'path'
-      this.path2Points = this.board!.path2!.map((id) => {
-        const w = toWorld(this.board!.cells.get(id)!.center);
-        return new THREE.Vector3(w[0], 0, w[2]);
-      });
-      this.path2Open = true;
+      const alt = this.board!.altPaths[this.pendingAltIndex];
+      if (alt) {
+        this.openAltPaths.push(
+          alt.map((id) => {
+            const w = toWorld(this.board!.cells.get(id)!.center);
+            return new THREE.Vector3(w[0], 0, w[2]);
+          }),
+        );
+      }
+      this.pendingAltIndex = -1;
     }
   }
 
@@ -616,7 +629,7 @@ export class BoardView {
         } else if (atk === 'homing') {
           this.fireHoming(tp, best, dmg, t.def.projSpeed ?? 0.6, color, size, trail);
         } else if (atk === 'slow') {
-          this.fireSlow(tp, target, dmg, t.def.projSpeed ?? 0.9, color, size, trail, t.def.slowFactor ?? 0.5, t.def.slowDur ?? 1.5);
+          this.fireSlowField(tp, range, dmg, color, t.def.slowFactor ?? 0.5, t.def.slowDur ?? 1.5);
         } else {
           this.fireStraight(tp, target, dmg, t.def.projSpeed ?? 0.9, color, size, trail);
         }
@@ -642,11 +655,50 @@ export class BoardView {
     this.pushProj({ pos: from.clone(), vel: dir, kind: 'homing', target, damage: dmg, splash: 0, gravity: 0, ttl: 3, maxTtl: 3, color, size, trail: [], trailMax });
   }
 
-  private fireSlow(from: THREE.Vector3, toPos: THREE.Vector3, dmg: number, speed: number, color: THREE.Color, size: number, trailMax: number, slowF: number, slowD: number): void {
-    const dir = new THREE.Vector3().subVectors(toPos, from);
-    const l = dir.length() || 1;
-    dir.multiplyScalar(speed / l);
-    this.pushProj({ pos: from.clone(), vel: dir, kind: 'single', target: null, damage: dmg, splash: 0, gravity: 0, ttl: 2, maxTtl: 2, color, size, trail: [], trailMax, slowF, slowD });
+  /** Slow field: on each shot, tether lightning from the tower to EVERY enemy in
+   * range, damaging and slowing them all at once (area debuff). */
+  private fireSlowField(from: THREE.Vector3, range: number, dmg: number, color: THREE.Color, slowF: number, slowD: number): void {
+    let hit = 0;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const ep = e.object.position;
+      if (Math.hypot(from.x - ep.x, from.z - ep.z) > range) continue; // XZ range, like targeting
+      e.damage(dmg);
+      e.applySlow(slowF, slowD);
+      this.spawnLightning(from, ep, color);
+      this.spawnBurst(ep, 3, { speed: 0.12, up: 0.02, size: 0.03, color, ttl: 0.16, gravity: 0 }); // zap spark
+      hit++;
+    }
+    if (hit) this.spawnBurst(from, 5, { speed: 0.2, up: 0.04, size: 0.035, color, ttl: 0.12, gravity: 0 }); // emitter flash
+  }
+
+  /** A jagged lightning bolt (fading additive line) from the tower to a target. */
+  private spawnLightning(from: THREE.Vector3, to: THREE.Vector3, color: THREE.Color): void {
+    const dir = new THREE.Vector3().subVectors(to, from);
+    const len = dir.length() || 1;
+    dir.multiplyScalar(1 / len);
+    const up = new THREE.Vector3(0, 1, 0);
+    let n1 = new THREE.Vector3().crossVectors(dir, up);
+    if (n1.lengthSq() < 1e-6) n1.set(1, 0, 0);
+    n1.normalize();
+    const n2 = new THREE.Vector3().crossVectors(dir, n1).normalize();
+    const seg = 7;
+    const amp = 0.06 * len;
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= seg; i++) {
+      const f = i / seg;
+      const p = from.clone().addScaledVector(dir, len * f);
+      if (i > 0 && i < seg) {
+        p.addScaledVector(n1, (Math.random() - 0.5) * amp);
+        p.addScaledVector(n2, (Math.random() - 0.5) * amp);
+      }
+      pts.push(p);
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+    const line = new THREE.Line(geo, mat);
+    this.effectsGroup.add(line);
+    this.effects.push({ line, mat, ttl: 0.16, max: 0.16 });
   }
 
   private fireSpread(from: THREE.Vector3, toPos: THREE.Vector3, dmg: number, speed: number, pellets: number, color: THREE.Color, size: number): void {
