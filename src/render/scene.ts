@@ -15,6 +15,7 @@ import { Unit, Enemy } from '../units/unit';
 import { UNIT_BY_KEY, upgradeCost, REFUND_FRACTION } from '../units/roster';
 import { HeartBase } from './heart-base';
 import { EffectsSystem } from './effects';
+import { buildBoardGeometry } from './terrain-build';
 import {
   toWorld, WALL_HEIGHT, cellRadius, insetPolygon, pointInPolygon, insetWorld,
   appendBlockWire, appendBlockSolid,
@@ -145,36 +146,12 @@ export class BoardView {
 
     // buildable = raised green platforms (towers on top); blocked = grey walls;
     // path/spawn/base = low dark hallway floor. Batched per material.
-    const solid = this.mountainStyle === 'solid';
-    const floorSegs: number[] = [];
-    const buildWire: number[] = [];
-    const buildTris: number[] = [];
-    const blockWire: number[] = [];
-    const blockTris: number[] = [];
-
-    for (const cell of board.cells.values()) {
-      if (cell.terrain === 'buildable') {
-        if (solid) appendBlockSolid(buildTris, cell);
-        else appendBlockWire(buildWire, cell);
-      } else if (cell.terrain === 'blocked') {
-        if (solid) appendBlockSolid(blockTris, cell);
-        else appendBlockWire(blockWire, cell);
-      } else {
-        // path / spawn / base — low floor outline (the hallway enemies walk)
-        const poly = cell.polygon;
-        for (let i = 0; i < poly.length; i++) {
-          const a = toWorld(poly[i]!);
-          const b = toWorld(poly[(i + 1) % poly.length]!);
-          floorSegs.push(a[0], 0, a[2], b[0], 0, b[2]);
-        }
-      }
-    }
-
-    this.addLineSegments(floorSegs, THEME.hallway, 0.5);
-    this.addLineSegments(buildWire, THEME.buildWire, 0.85);
-    this.addLineSegments(blockWire, THEME.mountainWire, 0.9);
-    this.addSolidBlocks(buildTris, THEME.buildSolid);
-    this.addSolidBlocks(blockTris, THEME.mountainSolid);
+    const g = buildBoardGeometry(board, this.mountainStyle === 'solid');
+    this.addLineSegments(g.floorSegs, THEME.hallway, 0.5);
+    this.addLineSegments(g.buildWire, THEME.buildWire, 0.85);
+    this.addLineSegments(g.blockWire, THEME.mountainWire, 0.9);
+    this.addSolidBlocks(g.buildTris, THEME.buildSolid);
+    this.addSolidBlocks(g.blockTris, THEME.mountainSolid);
 
     // Accent ring(s) for spawn(s); the base is marked by the Heart (see setBoard).
     for (const s of board.spawns) this.addMarker(board.cells.get(s)!, THEME.spawn);
