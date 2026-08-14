@@ -20,18 +20,17 @@ A mobile tower-defense game on a procedurally generated organic board.
   base. Currency buys and upgrades towers.
 - **Lives.** A fixed pool per level; the level ends at zero.
 
-## This milestone (Board)
+## Playing
 
-What you can test right now:
-
-- **Tap a cell** to inspect it — its id, terrain type, and neighbour count show
-  in the bottom readout, and the cell outlines in white.
+- **Press PLAY** to start a run. Enemies spawn in escalating waves and walk the
+  fixed path to your base.
+- **Tap a buildable cell** to open the radial menu and place a tower; tap a
+  placed tower to upgrade or sell it. See the **Towers** and **Enemies** tabs
+  for each unit's sprite, role, and stats.
 - **Regenerate** makes a new random board (new seed). Board layout is procedural
   and independent of wave difficulty.
 - **Version badge** (top-right) confirms which build you're running and opens
-  this Rules panel and the Dev Log.
-
-Towers, enemies, economy, and the lightning capstone are not in this build yet.
+  this panel and the Dev Log.
 
 ## Project rules
 

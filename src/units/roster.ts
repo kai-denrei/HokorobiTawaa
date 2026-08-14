@@ -89,8 +89,8 @@ export const TOWERS: UnitDef[] = [
   { key: 'spiral', label: 'Rapid', role: 'Rapid single-target', family: 'tower', color: T_CYAN, spin: 0.5, idle: 'spin', range: 0.16, fireRate: 3.0, damage: 7, attack: 'single', projSpeed: 1.2, cost: 70, projColor: T_CYAN, projSize: 0.016, projTrail: 3 },
   { key: 'dspiral', label: 'Homing', role: 'Homing bolts', family: 'tower', color: T_AZURE, idle: 'none', range: 0.16, fireRate: 1.2, damage: 9, attack: 'homing', projSpeed: 0.6, cost: 90, projColor: T_AZURE, projSize: 0.024, projTrail: 6 },
   { key: 'teardrop', label: 'Sniper', role: 'Sniper · fast round', family: 'tower', color: 0xffffff, idle: 'none', range: 0.32, fireRate: 0.7, damage: 45, attack: 'single', projSpeed: 2.4, cost: 130, projColor: 0xffffff, projSize: 0.024, projTrail: 8 },
-  { key: 'songs', label: 'Spread', role: 'Spread · area', family: 'tower', color: T_TEAL, idle: 'none', range: 0.14, fireRate: 1.0, damage: 6, attack: 'spread', pellets: 5, projSpeed: 0.7, cost: 80, projColor: T_TEAL, projSize: 0.014, projTrail: 0 },
-  { key: 'pyramid', label: 'Slow', role: 'Slow field', family: 'tower', color: T_PALE, idle: 'none', range: 0.16, fireRate: 1.0, damage: 4, attack: 'slow', projSpeed: 0.9, cost: 100, projColor: T_PALE, projSize: 0.026, projTrail: 4, slowFactor: 0.45, slowDur: 1.6 },
+  { key: 'songs', shape: 'dodeca', label: 'Spread', role: 'Spread · area', family: 'tower', color: T_TEAL, idle: 'none', range: 0.14, fireRate: 1.0, damage: 6, attack: 'spread', pellets: 5, projSpeed: 0.7, cost: 80, projColor: T_TEAL, projSize: 0.014, projTrail: 0 },
+  { key: 'pyramid', label: 'Slow', role: 'Slow field', family: 'tower', color: T_PALE, idle: 'none', range: 0.16, fireRate: 1.0, damage: 4, attack: 'slow', projSpeed: 0.9, cost: 100, projColor: T_PALE, projSize: 0.026, projTrail: 4, slowFactor: 0.45, slowDur: 1.6, sizeScale: 0.72 },
   { key: 'dna', label: 'Laser', role: 'Capstone · laser', family: 'tower', color: T_LASER, spin: 0.4, idle: 'spin', range: 0.24, fireRate: 1.5, damage: 18, attack: 'beam', cost: 220, projColor: T_LASER },
 ];
 

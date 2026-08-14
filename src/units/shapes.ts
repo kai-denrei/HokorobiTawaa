@@ -246,17 +246,16 @@ function cubePts(): P[] {
 }
 
 function pyramidPts(): P[] {
+  // Triangle-base pyramid (tetrahedron): 3 base corners + apex.
   const pts: P[] = [];
   const apex: P = [0, 1, 0];
-  const by = -0.75;
-  const br = 0.9;
-  const c: P[] = [[br, by, br], [-br, by, br], [-br, by, -br], [br, by, -br]];
-  // four slanted faces (apex + two adjacent base corners), triangle-sampled
-  for (let f = 0; f < 4; f++) {
-    const A = apex;
-    const B = c[f]!;
-    const C = c[(f + 1) % 4]!;
-    const N = 9;
+  const by = -0.55;
+  const br = 0.78;
+  const c: P[] = [0, 1, 2].map((k) => {
+    const ang = -Math.PI / 2 + (k / 3) * 2 * Math.PI;
+    return [br * Math.cos(ang), by, br * Math.sin(ang)] as P;
+  });
+  const tri = (A: P, B: P, C: P, N: number): void => {
     for (let i = 0; i <= N; i++) {
       for (let j = 0; j <= N - i; j++) {
         const u = i / N;
@@ -265,12 +264,75 @@ function pyramidPts(): P[] {
         pts.push([A[0]! * w + B[0]! * u + C[0]! * v, A[1]! * w + B[1]! * u + C[1]! * v, A[2]! * w + B[2]! * u + C[2]! * v]);
       }
     }
-  }
-  // base square grid
-  const M = 8;
-  for (let i = 0; i <= M; i++) {
-    for (let j = 0; j <= M; j++) {
-      pts.push([br - (2 * br * i) / M, by, br - (2 * br * j) / M]);
+  };
+  // three slanted faces (apex + two adjacent base corners)
+  for (let f = 0; f < 3; f++) tri(apex, c[f]!, c[(f + 1) % 3]!, 10);
+  // triangular base
+  tri(c[0]!, c[1]!, c[2]!, 8);
+  return fitUnit(pts);
+}
+
+function dodecaPts(): P[] {
+  // Regular dodecahedron: 20 vertices, 12 pentagon faces. Faces are found per
+  // face-normal (the dual icosahedron's vertices), then sampled as dots —
+  // pentagon outlines plus a light triangle-fan interior fill.
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const inv = 1 / phi;
+  const V: P[] = [];
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) V.push([x, y, z]);
+  for (const a of [-inv, inv]) for (const b of [-phi, phi]) V.push([0, a, b]);
+  for (const a of [-inv, inv]) for (const b of [-phi, phi]) V.push([a, b, 0]);
+  for (const a of [-phi, phi]) for (const b of [-inv, inv]) V.push([a, 0, b]);
+  const Vn = V.map(normV);
+  // face normals = icosahedron vertices
+  const N: P[] = [];
+  for (const a of [-1, 1]) for (const b of [-phi, phi]) N.push([0, a, b]);
+  for (const a of [-1, 1]) for (const b of [-phi, phi]) N.push([a, b, 0]);
+  for (const a of [-phi, phi]) for (const b of [-1, 1]) N.push([a, 0, b]);
+
+  const dot = (a: P, b: P): number => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+  const pts: P[] = [];
+  for (const n0 of N) {
+    const n = normV(n0);
+    // the face's 5 vertices are those most aligned with the face normal
+    const face = V.map((v, i) => ({ v, d: dot(Vn[i]!, n) }))
+      .sort((a, b) => b.d - a.d)
+      .slice(0, 5)
+      .map((o) => o.v);
+    const c: P = [0, 0, 0];
+    for (const v of face) { c[0] = c[0]! + v[0]! / 5; c[1] = c[1]! + v[1]! / 5; c[2] = c[2]! + v[2]! / 5; }
+    // in-plane basis to order the ring by angle
+    let u = normV(crossV(n, Math.abs(n[1]!) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
+    const w = crossV(n, u);
+    const ring = face
+      .map((v) => {
+        const d: P = [v[0]! - c[0]!, v[1]! - c[1]!, v[2]! - c[2]!];
+        return { v, ang: Math.atan2(dot(d, w), dot(d, u)) };
+      })
+      .sort((a, b) => a.ang - b.ang)
+      .map((o) => o.v);
+    for (let e = 0; e < 5; e++) {
+      const A = ring[e]!;
+      const B = ring[(e + 1) % 5]!;
+      const seg = 7; // pentagon edge dots
+      for (let s = 0; s < seg; s++) {
+        const t = s / seg;
+        pts.push([A[0]! + (B[0]! - A[0]!) * t, A[1]! + (B[1]! - A[1]!) * t, A[2]! + (B[2]! - A[2]!) * t]);
+      }
+      // interior fill: triangle fan (centroid, A, B)
+      const M = 4;
+      for (let i = 1; i <= M; i++) {
+        for (let j = 0; j <= M - i; j++) {
+          const bu = i / M;
+          const bv = j / M;
+          const bw = 1 - bu - bv;
+          pts.push([
+            c[0]! * bw + A[0]! * bu + B[0]! * bv,
+            c[1]! * bw + A[1]! * bu + B[1]! * bv,
+            c[2]! * bw + A[2]! * bu + B[2]! * bv,
+          ]);
+        }
+      }
     }
   }
   return fitUnit(pts);
@@ -460,6 +522,7 @@ export const SHAPES: Record<string, ShapeDef> = {
   dspiral: toShape('dspiral', 'Double Spiral', dblSpiralPts()),
   teardrop: toShape('teardrop', 'Teardrop', teardropPts()),
   songs: toShape('songs', 'SONGS Domes', songsPts()),
+  dodeca: toShape('dodeca', 'Dodecahedron', dodecaPts()),
   pyramid: toShape('pyramid', 'Pyramid', pyramidPts()),
   cube: toShape('cube', 'Cube', cubePts()),
   dna: toShape('dna', 'DNA Helix', dnaPts()),

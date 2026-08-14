@@ -121,7 +121,9 @@ html, body {
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  /* above the attract/title screen (55) and result screen (60) so the panel
+     is always readable — the PLAY button must never sit in front of it. */
+  z-index: 70;
   padding: 16px;
 }
 .hk-scrim.is-open { display: flex; }
@@ -195,6 +197,40 @@ html, body {
   font-size: 11px;
   opacity: 0.4;
   border-top: 1px solid rgba(31,122,63,0.3);
+}
+
+/* ---- Towers / Enemies gallery ---- */
+.hk-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.hk-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(53,255,122,0.04);
+  border: 1px solid rgba(31,122,63,0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.hk-card-sprite {
+  flex: 0 0 auto;
+  background: radial-gradient(circle at 50% 45%, rgba(53,255,122,0.06), rgba(0,0,0,0) 70%);
+  border-radius: 8px;
+}
+.hk-card-text { min-width: 0; }
+.hk-card-name { font-size: 14px; color: var(--hk-green); }
+.hk-card-role { font-size: 11px; opacity: 0.6; margin-top: 1px; }
+.hk-card-stats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.hk-chip {
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #bffcd6;
+  background: rgba(53,255,122,0.08);
+  border: 1px solid rgba(31,122,63,0.5);
 }
 
 /* ---- attract / title screen ---- */
@@ -306,6 +342,7 @@ html, body {
 }
 .hk-result-title.is-won { color: var(--hk-green); text-shadow: 0 0 24px rgba(53,255,122,0.6); }
 .hk-result-sub { font-size: 13px; opacity: 0.7; margin-bottom: 6px; }
+.hk-result-actions { display: flex; gap: 10px; align-items: center; }
 
 /* ---- radial menu (tower placement / actions) ---- */
 .hk-radial {
