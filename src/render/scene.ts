@@ -36,8 +36,6 @@ function projColor(hex: number): THREE.Color {
 
 // Pure coordinate + block-geometry helpers live in ./coords (unit-tested).
 
-export type PickHandler = (cellId: number | null, cell: Cell | null) => void;
-
 export class BoardView {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
