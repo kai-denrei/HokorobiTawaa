@@ -22,7 +22,7 @@ import {
 } from './coords';
 import {
   VIEWS, STATIC_POSES, advanceTween, smoothPose,
-  densestCluster, meanVec, waveDir, actionPose, trenchPose,
+  densestCluster, actionPose, trenchPose,
   ACTION_RADIUS, DYN_TAU, type Pose, type CamTween, type Vec3,
 } from './camera-views';
 
@@ -83,6 +83,12 @@ export class BoardView {
   private dynamicView: 'action' | 'trench' | null = null;
   /** Last computed follow target — held when there are momentarily no enemies. */
   private dynDesired: Pose | null = null;
+  /** Trench view (5) locks onto ONE enemy and follows it the whole way rather
+   * than a jittery centroid; only re-acquired when that enemy is gone. */
+  private trenchTarget: Enemy | null = null;
+  /** False until the first trench target is picked — the first pick grabs the
+   * lead of the wave; later re-acquisitions grab the newest spawn. */
+  private trenchAcquired = false;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
@@ -144,7 +150,23 @@ export class BoardView {
       this.camTween = null;
       this.dynamicView = v.mode;
       this.dynDesired = null;
+      if (v.mode === 'trench') {
+        this.trenchTarget = null; // re-entry starts from the lead of the wave again
+        this.trenchAcquired = false;
+      }
     }
+  }
+
+  /** Choose the enemy the trench cam follows. Keeps the current target while it's
+   * still alive on the path; on first pick grabs the lead of the wave (first
+   * spawned), and after the target dies/leaks grabs the newest spawn (which has
+   * the whole trench ahead, so it's followed longest → fewest jarring jumps). */
+  private pickTrenchTarget(live: Enemy[]): Enemy | null {
+    if (live.length === 0) return null;
+    if (this.trenchTarget && live.includes(this.trenchTarget)) return this.trenchTarget;
+    this.trenchTarget = this.trenchAcquired ? live[live.length - 1]! : live[0]!;
+    this.trenchAcquired = true;
+    return this.trenchTarget;
   }
 
   /** Currently-selected view index, and how many views exist — used to cycle
@@ -176,9 +198,8 @@ export class BoardView {
         const hot = densestCluster(pts, ACTION_RADIUS);
         if (hot) desired = actionPose(hot);
       } else {
-        const centroid = meanVec(live.map((e): Vec3 => [e.object.position.x, e.object.position.y, e.object.position.z]));
-        const dir = waveDir(live.map((e): Vec3 => [e.dir.x, e.dir.y, e.dir.z]));
-        desired = trenchPose(centroid, dir);
+        const t = this.pickTrenchTarget(live);
+        if (t) desired = trenchPose([t.object.position.x, t.object.position.y, t.object.position.z], [t.dir.x, t.dir.y, t.dir.z]);
       }
     }
     if (!desired) desired = this.currentPose(); // nothing to follow yet → hold

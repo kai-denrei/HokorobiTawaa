@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   VIEWS, STATIC_POSES, ease, poseAt, advanceTween, smoothPose,
-  meanVec, densestCluster, waveDir, actionPose, trenchPose,
+  densestCluster, actionPose, trenchPose,
   type Pose, type CamTween, type Vec3,
 } from './camera-views';
 
@@ -63,11 +63,8 @@ describe('smoothPose (exponential follow)', () => {
   });
 });
 
-describe('meanVec / densestCluster', () => {
-  it('meanVec averages componentwise', () => {
-    expect(meanVec([[0, 0, 0], [2, 4, 6]])).toEqual([1, 2, 3]);
-  });
-  it('densestCluster returns null for no points', () => {
+describe('densestCluster', () => {
+  it('returns null for no points', () => {
     expect(densestCluster([], 0.1)).toBeNull();
   });
   it('finds the centroid of the tight knot, ignoring a far outlier', () => {
@@ -77,18 +74,6 @@ describe('meanVec / densestCluster', () => {
     expect(c[0]).toBeCloseTo(1, 1);
     expect(c[2]).toBeCloseTo(1, 1);
     expect(c[0]).toBeGreaterThan(0); // not dragged toward the (-5,-5) outlier
-  });
-});
-
-describe('waveDir', () => {
-  it('averages and normalises headings to unit length', () => {
-    const d = waveDir([[1, 0, 0], [0, 0, 1]]);
-    expect(Math.hypot(d[0], d[2])).toBeCloseTo(1, 6);
-    expect(d[0]).toBeCloseTo(Math.SQRT1_2, 6);
-    expect(d[2]).toBeCloseTo(Math.SQRT1_2, 6);
-  });
-  it('falls back when headings cancel out', () => {
-    expect(waveDir([[1, 0, 0], [-1, 0, 0]], [0, 0, 1])).toEqual([0, 0, 1]);
   });
 });
 

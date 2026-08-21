@@ -89,14 +89,6 @@ const TRENCH_HEIGHT = 0.06; // low — down among the walls (WALL_HEIGHT is 0.06
 const TRENCH_LOOK_Y = 0.038;
 const TRENCH_FOV = 64; // wide + immersive
 
-/** Mean of a non-empty point list (caller guarantees length > 0). */
-export function meanVec(points: Vec3[]): Vec3 {
-  let x = 0, y = 0, z = 0;
-  for (const p of points) { x += p[0]; y += p[1]; z += p[2]; }
-  const n = points.length;
-  return [x / n, y / n, z / n];
-}
-
 /** Centroid of the densest XZ cluster: for each point, average its neighbours
  * within `radius`; return the centroid of whichever neighbourhood is biggest.
  * O(n²) but n = live enemies (tens). Returns null for an empty list. */
@@ -119,16 +111,6 @@ export function densestCluster(points: Vec3[], radius: number): Vec3 | null {
   return best;
 }
 
-/** Average heading of a wave (each `dir` is a unit-ish XZ vector), normalised.
- * Falls back to `fallback` when the headings cancel out (e.g. a tight U-turn). */
-export function waveDir(dirs: Vec3[], fallback: Vec3 = [0, 0, 1]): Vec3 {
-  let x = 0, z = 0;
-  for (const d of dirs) { x += d[0]; z += d[2]; }
-  const len = Math.hypot(x, z);
-  if (len < 1e-3) return fallback;
-  return [x / len, 0, z / len];
-}
-
 /** View 4 pose: a fixed close 3/4 offset looking down at the action `hotspot`. */
 export function actionPose(hotspot: Vec3): Pose {
   return {
@@ -138,12 +120,12 @@ export function actionPose(hotspot: Vec3): Pose {
   };
 }
 
-/** View 5 pose: sit low behind the wave `centroid` (opposite its `dir`) and look
- * forward along the trench, so the pack streams away from the camera. */
-export function trenchPose(centroid: Vec3, dir: Vec3): Pose {
+/** View 5 pose: sit low behind the followed enemy `anchor` (opposite its heading
+ * `dir`) and look forward along the trench, so it streams away from the camera. */
+export function trenchPose(anchor: Vec3, dir: Vec3): Pose {
   return {
-    position: [centroid[0] - dir[0] * TRENCH_BEHIND, TRENCH_HEIGHT, centroid[2] - dir[2] * TRENCH_BEHIND],
-    target: [centroid[0] + dir[0] * TRENCH_AHEAD, TRENCH_LOOK_Y, centroid[2] + dir[2] * TRENCH_AHEAD],
+    position: [anchor[0] - dir[0] * TRENCH_BEHIND, TRENCH_HEIGHT, anchor[2] - dir[2] * TRENCH_BEHIND],
+    target: [anchor[0] + dir[0] * TRENCH_AHEAD, TRENCH_LOOK_Y, anchor[2] + dir[2] * TRENCH_AHEAD],
     fov: TRENCH_FOV,
   };
 }
