@@ -280,6 +280,9 @@ export class Enemy extends Unit {
   private errMult = 1;
   /** External aura speed multiplier, set by the scene each frame. */
   auraMult = 1;
+  /** Current travel heading (unit XZ vector), refreshed each walked frame. The
+   * trench follow-cam uses it to sit behind the wave and look where it's going. */
+  readonly dir = new THREE.Vector3(0, 0, 1);
 
   constructor(
     def: UnitDef,
@@ -378,10 +381,14 @@ export class Enemy extends Unit {
     const segLen = (this.cum[seg + 1] ?? this.total) - this.cum[seg]!;
     const f = segLen > 1e-6 ? (this.dist - this.cum[seg]!) / segLen : 0;
     this.animateIdle(elapsed);
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const dl = Math.hypot(dx, dz);
+    if (dl > 1e-6) this.dir.set(dx / dl, 0, dz / dl);
     this.object.position.set(
-      a.x + (b.x - a.x) * f,
+      a.x + dx * f,
       this.baseY + this.restY + this.bob(elapsed),
-      a.z + (b.z - a.z) * f,
+      a.z + dz * f,
     );
   }
 }

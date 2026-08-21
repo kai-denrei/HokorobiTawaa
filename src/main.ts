@@ -276,12 +276,12 @@ canvas.addEventListener('pointerup', (e) => {
   }
 });
 
-// Camera presets: number keys 1 / 2 / 3 switch cinematic views (any mode).
+// Camera views: number keys 1–5 switch views, incl. the dynamic ones (any mode).
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; // don't hijack the slider
-  const n = e.key === '1' ? 0 : e.key === '2' ? 1 : e.key === '3' ? 2 : -1;
+  const n = /^[1-9]$/.test(e.key) ? parseInt(e.key, 10) - 1 : -1;
   if (n < 0 || n >= view.viewCount) return;
   e.preventDefault();
   selectView(n);

@@ -20,7 +20,11 @@ import {
   toWorld, WALL_HEIGHT, cellRadius, insetPolygon, pointInPolygon, insetWorld,
   appendBlockWire, appendBlockSolid,
 } from './coords';
-import { CAMERA_VIEWS, advanceTween, type Pose, type CamTween } from './camera-views';
+import {
+  VIEWS, STATIC_POSES, advanceTween, smoothPose,
+  densestCluster, meanVec, waveDir, actionPose, trenchPose,
+  ACTION_RADIUS, DYN_TAU, type Pose, type CamTween, type Vec3,
+} from './camera-views';
 
 export type MountainStyle = 'wire' | 'solid';
 
@@ -71,9 +75,14 @@ export class BoardView {
   private camTarget = new THREE.Vector3();
   /** In-flight cinematic camera move between view presets (null when idle). */
   private camTween: CamTween | null = null;
-  /** Index of the currently-selected camera preset (source of truth for the HUD
+  /** Index of the currently-selected camera view (source of truth for the HUD
    * selector; updated by setView regardless of who triggered it). */
   private currentViewIndex = 0;
+  /** When a dynamic view (Action/Trench) is active, the camera follows a pose
+   * recomputed every frame from enemy positions; null for the static views. */
+  private dynamicView: 'action' | 'trench' | null = null;
+  /** Last computed follow target — held when there are momentarily no enemies. */
+  private dynDesired: Pose | null = null;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
@@ -104,10 +113,10 @@ export class BoardView {
     key.position.set(-0.8, 1.2, 0.5);
     this.scene.add(key);
 
-    this.camera = new THREE.PerspectiveCamera(CAMERA_VIEWS[0]!.fov, 1, 0.01, 100);
+    this.camera = new THREE.PerspectiveCamera(STATIC_POSES[0]!.fov, 1, 0.01, 100);
     // Start on view 1 — the steep tilted overview that frames the whole
-    // [-0.5,0.5]² board. setView() tweens between the presets in camera-views.ts.
-    this.applyPose(CAMERA_VIEWS[0]!);
+    // [-0.5,0.5]² board. setView() switches among the views in camera-views.ts.
+    this.applyPose(STATIC_POSES[0]!);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -123,24 +132,58 @@ export class BoardView {
    * tween is seeded from the camera's CURRENT pose, so tapping another view
    * mid-move glides on from wherever it is instead of snapping. */
   setView(index: number): void {
-    const to = CAMERA_VIEWS[index];
-    if (!to) return;
+    const v = VIEWS[index];
+    if (!v) return;
     this.currentViewIndex = index;
-    const from: Pose = {
-      position: [this.camera.position.x, this.camera.position.y, this.camera.position.z],
-      target: [this.camTarget.x, this.camTarget.y, this.camTarget.z],
-      fov: this.camera.fov,
-    };
-    this.camTween = { from, to, t: 0, dur: 0.85 };
+    if (v.kind === 'static') {
+      this.dynamicView = null;
+      this.camTween = { from: this.currentPose(), to: v.pose, t: 0, dur: 0.85 };
+    } else {
+      // dynamic: cancel any static tween; stepDynamicView eases the camera in
+      // from wherever it currently is and then follows the action each frame.
+      this.camTween = null;
+      this.dynamicView = v.mode;
+      this.dynDesired = null;
+    }
   }
 
-  /** Currently-selected preset index, and how many presets exist — used to cycle
+  /** Currently-selected view index, and how many views exist — used to cycle
    * views (keyboard / swipe) and reflect the active one in the HUD. */
   get currentView(): number {
     return this.currentViewIndex;
   }
   get viewCount(): number {
-    return CAMERA_VIEWS.length;
+    return VIEWS.length;
+  }
+
+  private currentPose(): Pose {
+    return {
+      position: [this.camera.position.x, this.camera.position.y, this.camera.position.z],
+      target: [this.camTarget.x, this.camTarget.y, this.camTarget.z],
+      fov: this.camera.fov,
+    };
+  }
+
+  /** Follow-cam step for the dynamic views: recompute a target pose from live
+   * enemies and ease the camera toward it (smoothed so live data doesn't jitter).
+   * Action = close-up on the densest fight; Trench = low chase behind the wave. */
+  private stepDynamicView(dt: number): void {
+    const live = this.enemies.filter((e) => e.alive && !e.reachedEnd);
+    let desired = this.dynDesired;
+    if (live.length) {
+      if (this.dynamicView === 'action') {
+        const pts: Vec3[] = live.map((e) => [e.object.position.x, e.object.position.y, e.object.position.z]);
+        const hot = densestCluster(pts, ACTION_RADIUS);
+        if (hot) desired = actionPose(hot);
+      } else {
+        const centroid = meanVec(live.map((e): Vec3 => [e.object.position.x, e.object.position.y, e.object.position.z]));
+        const dir = waveDir(live.map((e): Vec3 => [e.dir.x, e.dir.y, e.dir.z]));
+        desired = trenchPose(centroid, dir);
+      }
+    }
+    if (!desired) desired = this.currentPose(); // nothing to follow yet → hold
+    this.dynDesired = desired;
+    this.applyPose(smoothPose(this.currentPose(), desired, dt, DYN_TAU));
   }
 
   /** Snap the live camera to a pose (position + look target + fov), keeping the
@@ -658,6 +701,7 @@ export class BoardView {
       const elapsed = now - this.clockStart;
       if (this.pathAnim) this.stepPathAnim(dt);
       if (this.camTween) this.stepCamTween(dt);
+      else if (this.dynamicView) this.stepDynamicView(dt);
       this.stepAura();
       for (const u of this.units) u.update(dt, elapsed);
       if (this.baseHeart) this.baseHeart.update(dt, elapsed);
