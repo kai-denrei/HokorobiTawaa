@@ -2,6 +2,7 @@
 // (place / upgrade / sell) and the bottom sheet (spawn palette + tower menu).
 
 import { el } from './dom';
+import { fitShift } from './radial-fit';
 import type { PaletteItem, RadialItem, RadialHandlers, TowerMenuInfo } from './types';
 
 export type Radial = {
@@ -10,6 +11,24 @@ export type Radial = {
   refresh: () => void;
   close: () => void;
 };
+
+/** env(safe-area-inset-left/right) in px — the notch / rounded-corner gutters at
+ * the sides (in landscape). The top/bottom chrome bars already carry the top and
+ * bottom insets, but nothing covers the horizontal ones. Measured via a throwaway
+ * probe (env() only resolves in real layout); read fresh since a rotation changes
+ * them, and menu-open is rare enough that one forced style read is cheap. */
+function horizontalInsets(): { left: number; right: number } {
+  const probe = el('div');
+  probe.style.cssText =
+    'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;' +
+    'padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);';
+  document.body.append(probe);
+  const s = getComputedStyle(probe);
+  const left = parseFloat(s.paddingLeft) || 0;
+  const right = parseFloat(s.paddingRight) || 0;
+  probe.remove();
+  return { left, right };
+}
 
 /** A ring of action buttons positioned at the tap point. */
 export function createRadial(): Radial {
@@ -36,17 +55,24 @@ export function createRadial(): Radial {
     radialOnClose = h.onClose ?? null;
     radialCanAfford = h.canAfford ?? null;
     radialButtons = [];
-    const R = 104;
-    const pad = 86;
-    const px = Math.max(pad, Math.min(window.innerWidth - pad, cx));
-    const py = Math.max(pad + 44, Math.min(window.innerHeight - pad - 60, cy));
+
+    // Ring radius scales down on small viewports so the whole wheel has a chance
+    // to fit before we nudge it (avoids a large ring that must always be shifted).
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const R = Math.max(66, Math.min(104, Math.min(vw, vh) * 0.3));
+
+    // Lay the ring out AT the tap point; we shift the whole thing into frame
+    // after measuring (see below). Buttons live in a wrapper we can translate in
+    // one go; the wrapper is click-through so taps on empty space still close.
+    const ring = el('div', 'hk-radial-ring');
     const n = items.length;
     items.forEach((it, i) => {
       const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
       const btn = el('button', 'hk-radial-item');
       if (isLocked(it)) btn.classList.add('is-locked');
-      btn.style.left = px + Math.cos(ang) * R + 'px';
-      btn.style.top = py + Math.sin(ang) * R + 'px';
+      btn.style.left = cx + Math.cos(ang) * R + 'px';
+      btn.style.top = cy + Math.sin(ang) * R + 'px';
       const dot = it.color != null ? `<span class="hk-radial-dot" style="color:#${it.color.toString(16).padStart(6, '0')}"></span>` : '';
       const cost = it.cost != null ? `<span class="hk-radial-cost">◆${it.cost}</span>` : '';
       btn.innerHTML = `${dot}<span class="hk-radial-label">${it.label}</span>${cost}`;
@@ -56,14 +82,40 @@ export function createRadial(): Radial {
         close();
       });
       btn.addEventListener('pointerenter', () => h.onFocus?.(it.key));
-      radial.append(btn);
+      ring.append(btn);
       radialButtons.push({ it, btn });
     });
     const center = el('div', 'hk-radial-center');
-    center.style.left = px + 'px';
-    center.style.top = py + 'px';
-    radial.append(center);
+    center.style.left = cx + 'px';
+    center.style.top = cy + 'px';
+    ring.append(center);
+    radial.append(ring);
     radial.classList.add('is-open');
+
+    // Measure the real button box (accounts for variable label widths) and shift
+    // the ring by the smallest offset that keeps it clear of the screen edges and
+    // the top/bottom chrome bars (whose rects already include safe-area insets).
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const { btn } of radialButtons) {
+      const r = btn.getBoundingClientRect();
+      if (r.left < minX) minX = r.left;
+      if (r.top < minY) minY = r.top;
+      if (r.right > maxX) maxX = r.right;
+      if (r.bottom > maxY) maxY = r.bottom;
+    }
+    if (Number.isFinite(minX)) {
+      const M = 8;
+      const ins = horizontalInsets();
+      const topBar = document.querySelector('.hk-top');
+      const botBar = document.querySelector('.hk-bottom');
+      const safeT = (topBar ? topBar.getBoundingClientRect().bottom : 0) + M;
+      const safeB = (botBar ? botBar.getBoundingClientRect().top : vh) - M;
+      const { dx, dy } = fitShift(
+        { minX, minY, maxX, maxY },
+        { l: M + ins.left, t: safeT, r: vw - M - ins.right, btm: safeB },
+      );
+      if (dx || dy) ring.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
   };
   const refresh = (): void => {
     if (!radial.classList.contains('is-open')) return;

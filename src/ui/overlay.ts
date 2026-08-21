@@ -54,6 +54,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     closeRadial: radial.close,
     closePalette: sheet.close,
     setHud: hud.set,
+    setActiveView: chrome.setActiveView,
     showResult: result.show,
     hideResult: result.hide,
     showTitle: () => {

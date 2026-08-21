@@ -52,6 +52,9 @@ export type Overlay = {
   closeRadial: () => void;
   closePalette: () => void;
   setHud: (data: HudData) => void;
+  /** Reflect the active camera preset (0..2) in the HUD selector, whatever
+   * triggered the change (button, keyboard, or swipe). */
+  setActiveView: (index: number) => void;
   showResult: (won: boolean, stats?: ResultStats) => void;
   hideResult: () => void;
   showTitle: () => void;
@@ -61,6 +64,8 @@ export type Overlay = {
 export type OverlayHandlers = {
   onRegenerate: () => void;
   onToggleMountains: (style: 'wire' | 'solid') => void;
+  /** Switch to camera preset `index` (0..2) with a cinematic transition. */
+  onSetView: (index: number) => void;
   onPlay: () => void;
   /** Maze target-cell count changed (applied on release). */
   onBoardSize?: (cells: number) => void;

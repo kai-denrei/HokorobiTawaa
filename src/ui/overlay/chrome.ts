@@ -14,6 +14,8 @@ export type Chrome = {
   badge: HTMLButtonElement;
   setCellInfo: (text: string) => void;
   setSeedInfo: (text: string) => void;
+  /** Highlight the active camera preset (0..2) in the segmented selector. */
+  setActiveView: (index: number) => void;
 };
 
 export function createChrome(handlers: OverlayHandlers): Chrome {
@@ -43,10 +45,30 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
     handlers.onToggleMountains(mountainSolid ? 'solid' : 'wire');
   });
 
+  // camera view selector — three cinematic presets, a compact segmented control
+  // grouped with the mountains toggle (both change how the board is viewed).
+  const views = el('div', 'hk-views');
+  views.setAttribute('role', 'group');
+  views.setAttribute('aria-label', 'Camera view');
+  const viewNames = ['Tactical', 'Cinematic', 'Overhead'];
+  const viewBtns = [0, 1, 2].map((i) => {
+    const b = el('button', 'hk-view-btn', String(i + 1));
+    b.title = `${viewNames[i]} camera view`;
+    if (i === 0) b.classList.add('is-active');
+    // delegate only — the highlight is updated via setActiveView so keyboard and
+    // swipe stay in sync through the same path (see the composer / main.ts).
+    b.addEventListener('click', () => handlers.onSetView(i));
+    return b;
+  });
+  for (const b of viewBtns) views.append(b);
+  const setActiveView = (index: number): void => {
+    for (const [j, x] of viewBtns.entries()) x.classList.toggle('is-active', j === index);
+  };
+
   const left = el('div', 'hk-bottom-left');
   left.append(info, seedInfo);
   const controls = el('div', 'hk-controls');
-  controls.append(toggle, regen);
+  controls.append(views, toggle, regen);
   bottom.append(left, controls);
 
   return {
@@ -55,5 +77,6 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
     badge,
     setCellInfo: (text) => { info.textContent = text; },
     setSeedInfo: (text) => { seedInfo.textContent = text; },
+    setActiveView,
   };
 }

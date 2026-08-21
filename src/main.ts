@@ -27,6 +27,7 @@ const overlay = createOverlay(app, {
     else newPlayBoard();
   },
   onToggleMountains: (style) => view.setMountainStyle(style),
+  onSetView: (index) => selectView(index),
   onPlay: () => startPlay(),
   onBoardSize: (n) => {
     boardSize = n;
@@ -62,6 +63,13 @@ view.onLeak = () => {
 view.onKill = (e) => {
   if (mode === 'play') game.onKill(e);
 };
+
+// Change camera preset, keeping the HUD selector highlight in sync. The single
+// path shared by the HUD buttons, the 1/2/3 keys, and the mobile swipe gesture.
+function selectView(index: number): void {
+  view.setView(index);
+  overlay.setActiveView(index);
+}
 
 // Radial menu to place a tower on an empty cell (near the tap), with a live
 // range preview as options are focused / on placement.
@@ -233,8 +241,18 @@ canvas.addEventListener('pointerdown', (e) => {
   downT = performance.now();
 });
 canvas.addEventListener('pointerup', (e) => {
-  const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
-  if (moved > 12 || performance.now() - downT > 600) return;
+  const dx = e.clientX - downX;
+  const dy = e.clientY - downY;
+  const heldMs = performance.now() - downT;
+  // Horizontal swipe cycles camera views (any mode). Reuses the drag gesture
+  // that otherwise just cancels a tap; must be deliberate and mostly flat so it
+  // doesn't fire on a sloppy tap. Swipe left → next preset, right → previous.
+  if (heldMs < 700 && Math.abs(dx) > 64 && Math.abs(dx) > Math.abs(dy) * 1.6) {
+    const dir = dx < 0 ? 1 : -1;
+    selectView((view.currentView + dir + view.viewCount) % view.viewCount);
+    return;
+  }
+  if (Math.hypot(dx, dy) > 12 || heldMs > 600) return;
   if (mode !== 'play') return; // no placement during the attract demo
   const hit = view.pick(e.clientX, e.clientY);
   view.highlightCell(hit?.cell ?? null);
@@ -256,6 +274,17 @@ canvas.addEventListener('pointerup', (e) => {
     overlay.closeRadial();
     selectedTower = null;
   }
+});
+
+// Camera presets: number keys 1 / 2 / 3 switch cinematic views (any mode).
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; // don't hijack the slider
+  const n = e.key === '1' ? 0 : e.key === '2' ? 1 : e.key === '3' ? 2 : -1;
+  if (n < 0 || n >= view.viewCount) return;
+  e.preventDefault();
+  selectView(n);
 });
 
 // PC quick-upgrade: with a tower selected (tapped), W or ↑ buys the next tier.

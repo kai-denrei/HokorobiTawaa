@@ -20,6 +20,7 @@ import {
   toWorld, WALL_HEIGHT, cellRadius, insetPolygon, pointInPolygon, insetWorld,
   appendBlockWire, appendBlockSolid,
 } from './coords';
+import { CAMERA_VIEWS, advanceTween, type Pose, type CamTween } from './camera-views';
 
 export type MountainStyle = 'wire' | 'solid';
 
@@ -65,6 +66,14 @@ export class BoardView {
   /** Alt index whose reveal animation is in flight (added once it finishes). */
   private pendingAltIndex = -1;
   private pathAnim: { group: THREE.Group; t: number } | null = null;
+  /** Current camera look-at point (the camera stores only orientation). Kept in
+   * sync by applyPose so a tween can ease the target, not just the position. */
+  private camTarget = new THREE.Vector3();
+  /** In-flight cinematic camera move between view presets (null when idle). */
+  private camTween: CamTween | null = null;
+  /** Index of the currently-selected camera preset (source of truth for the HUD
+   * selector; updated by setView regardless of who triggered it). */
+  private currentViewIndex = 0;
   /** Game hooks: per-frame tick, enemy reached base (leak), enemy killed. */
   onTick: ((dt: number) => void) | null = null;
   onLeak: (() => void) | null = null;
@@ -95,11 +104,10 @@ export class BoardView {
     key.position.set(-0.8, 1.2, 0.5);
     this.scene.add(key);
 
-    this.camera = new THREE.PerspectiveCamera(44, 1, 0.01, 100);
-    // Steep tilted view, pulled back to frame the whole [-0.5,0.5]² board with
-    // even margins (little sky, near edge clear of the bottom HUD).
-    this.camera.position.set(0, 1.62, 1.12);
-    this.camera.lookAt(0, 0, 0.04);
+    this.camera = new THREE.PerspectiveCamera(CAMERA_VIEWS[0]!.fov, 1, 0.01, 100);
+    // Start on view 1 — the steep tilted overview that frames the whole
+    // [-0.5,0.5]² board. setView() tweens between the presets in camera-views.ts.
+    this.applyPose(CAMERA_VIEWS[0]!);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
@@ -109,6 +117,50 @@ export class BoardView {
 
     this.resize();
     window.addEventListener('resize', this.resize);
+  }
+
+  /** Switch to camera preset `index` (0..2) with an eased "cinematic" move. The
+   * tween is seeded from the camera's CURRENT pose, so tapping another view
+   * mid-move glides on from wherever it is instead of snapping. */
+  setView(index: number): void {
+    const to = CAMERA_VIEWS[index];
+    if (!to) return;
+    this.currentViewIndex = index;
+    const from: Pose = {
+      position: [this.camera.position.x, this.camera.position.y, this.camera.position.z],
+      target: [this.camTarget.x, this.camTarget.y, this.camTarget.z],
+      fov: this.camera.fov,
+    };
+    this.camTween = { from, to, t: 0, dur: 0.85 };
+  }
+
+  /** Currently-selected preset index, and how many presets exist — used to cycle
+   * views (keyboard / swipe) and reflect the active one in the HUD. */
+  get currentView(): number {
+    return this.currentViewIndex;
+  }
+  get viewCount(): number {
+    return CAMERA_VIEWS.length;
+  }
+
+  /** Snap the live camera to a pose (position + look target + fov), keeping the
+   * base heart facing it. Used at construction and on every tween frame. */
+  private applyPose(p: Pose): void {
+    this.camera.position.set(p.position[0], p.position[1], p.position[2]);
+    this.camTarget.set(p.target[0], p.target[1], p.target[2]);
+    this.camera.lookAt(this.camTarget);
+    if (this.camera.fov !== p.fov) {
+      this.camera.fov = p.fov;
+      this.camera.updateProjectionMatrix(); // FOV changes are silent without this
+    }
+    // the heart is oriented to face the camera — re-face it as the camera moves.
+    this.baseHeart?.object.lookAt(this.camera.position);
+  }
+
+  private stepCamTween(dt: number): void {
+    const { pose, done } = advanceTween(this.camTween!, dt);
+    this.applyPose(pose);
+    if (done) this.camTween = null;
   }
 
   /** (Re)build the visible board from a Board data structure. */
@@ -605,6 +657,7 @@ export class BoardView {
       this.lastT = now;
       const elapsed = now - this.clockStart;
       if (this.pathAnim) this.stepPathAnim(dt);
+      if (this.camTween) this.stepCamTween(dt);
       this.stepAura();
       for (const u of this.units) u.update(dt, elapsed);
       if (this.baseHeart) this.baseHeart.update(dt, elapsed);
