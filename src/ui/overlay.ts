@@ -57,7 +57,10 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     closePalette: sheet.close,
     setHud: hud.set,
     setActiveView: chrome.setActiveView,
-    showResult: result.show,
+    showResult: (won, stats) => {
+      announce.hide(); // clear any in-flight wave card behind the result screen
+      result.show(won, stats);
+    },
     hideResult: result.hide,
     showWaveAnnounce: announce.show,
     hideWaveAnnounce: announce.hide,

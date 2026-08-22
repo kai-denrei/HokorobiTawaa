@@ -199,7 +199,7 @@ function demoTick(dt: number): void {
   // cinematic landing rotation: advance to the next view every few seconds
   attractViewTimer += dt;
   if (attractViewTimer >= ATTRACT_VIEW_PERIOD) {
-    attractViewTimer = 0;
+    attractViewTimer -= ATTRACT_VIEW_PERIOD; // keep the remainder (no drift on hitches)
     attractViewIdx = (attractViewIdx + 1) % ATTRACT_VIEWS.length;
     selectView(ATTRACT_VIEWS[attractViewIdx]!);
   }

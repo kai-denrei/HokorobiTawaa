@@ -241,7 +241,10 @@ export class Game {
     this.spawnedInGroup = 0;
     this.spawnTimer = 0;
     this.spawningDone = false;
-    this.cb.onWaveStart?.(this.waveIndex + 1, this.newTypes[this.waveIndex] ?? []);
+    // Only announce "new threats" on the first loop; on Continue loops the types
+    // aren't new to the player, so pass none (the card no-ops on an empty list).
+    const fresh = this.loop === 1 ? (this.newTypes[this.waveIndex] ?? []) : [];
+    this.cb.onWaveStart?.(this.waveIndex + 1, fresh);
   }
 
   private stepSpawning(dt: number): void {
