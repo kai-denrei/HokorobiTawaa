@@ -5,6 +5,7 @@
 import type { BoardView } from '../render/scene';
 import type { Enemy } from '../units/unit';
 import { START_GOLD, STREAK_STEP, STREAK_CAP } from '../units/roster';
+import { endlessWave, endlessHpScale } from './endless';
 
 export type GameStatus = 'ready' | 'active' | 'won' | 'lost';
 
@@ -40,6 +41,8 @@ export type GameCallbacks = {
    * can build anticipation. `wave` is 1-based; `newEnemyKeys` are the types this
    * wave introduces for the first time (empty if none / on Continue loops). */
   onWaveApproaching?: (wave: number, newEnemyKeys: string[]) => void;
+  /** Endless: reveal the next sector (>=1) at a fraying milestone. */
+  onFraying?: (sectorIndex: number) => void;
 };
 
 export type SpawnGroup = { key: string; count: number; interval: number };
@@ -104,6 +107,8 @@ export class Game {
   private loop = 1;
   private status: GameStatus = 'ready';
   private countdown = START_DELAY;
+  private endless = false;
+  private enemyKeys: string[] = [];
 
   // active-wave spawn cursor
   private groupIndex = 0;
@@ -134,6 +139,7 @@ export class Game {
     this.spawnedInGroup = 0;
     this.spawnTimer = 0;
     this.spawningDone = false;
+    this.endless = false;
     this.emitHud();
   }
 
@@ -154,6 +160,14 @@ export class Game {
     this.spawnTimer = 0;
     this.spawningDone = false;
     this.emitHud();
+  }
+
+  /** Begin an Endless run: authored waves 1-12 as the ramp, procedural after,
+   * never wins (result only on lives-out). `enemyKeys` seeds procedural waves. */
+  startEndless(enemyKeys: string[]): void {
+    this.reset();
+    this.endless = true;
+    this.enemyKeys = enemyKeys;
   }
 
   /** One enemy reached the base: lose a life and reset the kill streak. */
@@ -232,7 +246,7 @@ export class Game {
     // active
     this.stepSpawning(dt);
     if (this.spawningDone && this.view.enemyCount === 0) {
-      if (this.waveIndex >= this.waves.length - 1) {
+      if (!this.endless && this.waveIndex >= this.waves.length - 1) {
         this.status = 'won';
         this.cb.onResult('won', this.runStats());
       } else {
@@ -249,6 +263,14 @@ export class Game {
 
   private startNextWave(): void {
     this.waveIndex++;
+    // Endless: past the 12 authored waves, generate composition procedurally.
+    if (this.endless && this.waveIndex >= this.waves.length) {
+      this.waves[this.waveIndex] = endlessWave(this.waveIndex, this.enemyKeys);
+    }
+    // Fraying cadence: every 5th wave reveals the next sector (1-based sector idx).
+    if (this.endless && (this.waveIndex + 1) % 5 === 0) {
+      this.cb.onFraying?.((this.waveIndex + 1) / 5);
+    }
     this.status = 'active';
     this.groupIndex = 0;
     this.spawnedInGroup = 0;
@@ -265,7 +287,10 @@ export class Game {
     let guard = 0;
     while (!this.spawningDone && this.spawnTimer <= 0 && guard++ < 64) {
       const group = wave[this.groupIndex]!;
-      const hp = (HP_SCALE[this.waveIndex] ?? 1) * LOOP_HP_MULT ** (this.loop - 1);
+      const hpBase = this.endless && this.waveIndex >= 12
+        ? endlessHpScale(this.waveIndex)
+        : (HP_SCALE[this.waveIndex] ?? 1);
+      const hp = hpBase * LOOP_HP_MULT ** (this.loop - 1);
       this.view.spawnEnemy(group.key, hp);
       this.spawnedInGroup++;
       this.spawnTimer += group.interval;
