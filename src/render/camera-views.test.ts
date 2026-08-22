@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   VIEWS, DEFAULT_VIEW, DEFAULT_POSE, ease, poseAt, advanceTween, smoothPose,
-  densestCluster, actionPose, trenchPose, revealPose,
+  densestCluster, actionPose, trenchPose, bastionPose, revealPose,
   type Pose, type CamTween, type Vec3,
 } from './camera-views';
 
@@ -87,7 +87,18 @@ describe('actionPose (view 4)', () => {
   });
 });
 
-describe('trenchPose (view 5)', () => {
+describe('bastionPose (view 5)', () => {
+  it('sits behind the Heart and looks through it toward the enemies', () => {
+    const heart: Vec3 = [0, 0.1, 0];
+    const dir: Vec3 = [0, 0, 1]; // enemies approach from +z
+    const p = bastionPose(heart, dir);
+    expect(p.position[2]).toBeLessThan(heart[2]); // camera behind the Heart (−z side)
+    expect(p.target[2]).toBeGreaterThan(heart[2]); // looks through it toward +z (enemies)
+    expect(p.position[1]).toBeGreaterThan(heart[1]); // slightly above the Heart
+  });
+});
+
+describe('trenchPose (view 2)', () => {
   it('sits behind the centroid (opposite dir) and looks ahead, low + wide', () => {
     const c: Vec3 = [0, 0, 0];
     const dir: Vec3 = [0, 0, 1]; // wave heading +z
@@ -119,11 +130,12 @@ describe('revealPose', () => {
 });
 
 describe('VIEWS', () => {
-  it('exposes the five views in HUD-number order (1 Overhead … 5 Cinematic)', () => {
+  it('exposes the five views in HUD-number order (1 Overhead … 5 Bastion)', () => {
     expect(VIEWS).toHaveLength(5);
-    expect(VIEWS.map((v) => v.name)).toEqual(['Overhead', 'Trench', 'Tactical', 'Action', 'Cinematic']);
+    expect(VIEWS.map((v) => v.name)).toEqual(['Overhead', 'Trench', 'Tactical', 'Action', 'Bastion']);
     expect(VIEWS[1]).toMatchObject({ kind: 'dynamic', mode: 'trench' }); // #2
     expect(VIEWS[3]).toMatchObject({ kind: 'dynamic', mode: 'action' }); // #4
+    expect(VIEWS[4]).toMatchObject({ kind: 'dynamic', mode: 'bastion' }); // #5
   });
   it('defaults to Overhead (#1) and preserves the original Tactical pose at #3', () => {
     expect(DEFAULT_VIEW).toBe(0);

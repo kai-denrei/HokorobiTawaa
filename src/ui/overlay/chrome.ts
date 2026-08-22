@@ -53,7 +53,7 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
   const views = el('div', 'hk-views');
   views.setAttribute('role', 'group');
   views.setAttribute('aria-label', 'Camera view');
-  const viewNames = ['Overhead', 'Trench', 'Tactical', 'Action', 'Cinematic'];
+  const viewNames = ['Overhead', 'Trench', 'Tactical', 'Action', 'Bastion'];
   const viewBtns = [0, 1, 2, 3, 4].map((i) => {
     const b = el('button', 'hk-view-btn', String(i + 1));
     b.title = `${viewNames[i]} camera view`;

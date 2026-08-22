@@ -22,7 +22,7 @@ import {
 } from './coords';
 import {
   VIEWS, DEFAULT_VIEW, DEFAULT_POSE, advanceTween, smoothPose,
-  densestCluster, actionPose, trenchPose,
+  densestCluster, actionPose, trenchPose, bastionPose,
   ACTION_RADIUS, DYN_TAU, type Pose, type CamTween, type Vec3,
 } from './camera-views';
 
@@ -82,7 +82,7 @@ export class BoardView {
   private currentViewIndex = DEFAULT_VIEW; // view #1 (Overhead)
   /** When a dynamic view (Action/Trench) is active, the camera follows a pose
    * recomputed every frame from enemy positions; null for the static views. */
-  private dynamicView: 'action' | 'trench' | null = null;
+  private dynamicView: 'action' | 'trench' | 'bastion' | null = null;
   /** Last computed follow target — held when there are momentarily no enemies. */
   private dynDesired: Pose | null = null;
   /** Trench view (5) locks onto ONE enemy and follows it the whole way rather
@@ -205,19 +205,46 @@ export class BoardView {
   private stepDynamicView(dt: number): void {
     const live = this.enemies.filter((e) => e.alive && !e.reachedEnd);
     let desired = this.dynDesired;
-    if (live.length) {
-      if (this.dynamicView === 'action') {
+    if (this.dynamicView === 'action') {
+      if (live.length) {
         const pts: Vec3[] = live.map((e) => [e.object.position.x, e.object.position.y, e.object.position.z]);
         const hot = densestCluster(pts, ACTION_RADIUS);
         if (hot) desired = actionPose(hot);
-      } else {
+      }
+    } else if (this.dynamicView === 'trench') {
+      if (live.length) {
         const t = this.pickTrenchTarget(live);
         if (t) desired = trenchPose([t.object.position.x, t.object.position.y, t.object.position.z], [t.dir.x, t.dir.y, t.dir.z]);
       }
+    } else if (this.dynamicView === 'bastion') {
+      desired = this.bastionDesired(live) ?? desired;
     }
     if (!desired) desired = this.currentPose(); // nothing to follow yet → hold
     this.dynDesired = desired;
     this.applyPose(smoothPose(this.currentPose(), desired, dt, DYN_TAU));
+  }
+
+  /** View 5 (Bastion): a pose just behind the Heart looking through it toward the
+   * incoming enemies — the densest live cluster, or the primary spawn if none. */
+  private bastionDesired(live: Enemy[]): Pose | null {
+    if (!this.baseHeart || !this.board) return null;
+    const h = this.baseHeart.object.position;
+    const heart: Vec3 = [h.x, h.y, h.z];
+    let tx: number, tz: number;
+    if (live.length) {
+      const hot = densestCluster(live.map((e): Vec3 => [e.object.position.x, e.object.position.y, e.object.position.z]), ACTION_RADIUS)!;
+      tx = hot[0];
+      tz = hot[2];
+    } else {
+      const sw = toWorld(this.board.cells.get(this.board.spawns[0]!)!.center);
+      tx = sw[0];
+      tz = sw[2];
+    }
+    const dx = tx - heart[0];
+    const dz = tz - heart[2];
+    const len = Math.hypot(dx, dz);
+    const dir: Vec3 = len < 1e-3 ? [0, 0, 1] : [dx / len, 0, dz / len];
+    return bastionPose(heart, dir);
   }
 
   /** Snap the live camera to a pose (position + look target + fov), keeping the

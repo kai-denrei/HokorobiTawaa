@@ -15,23 +15,22 @@ export type Pose = { position: Vec3; target: Vec3; fov: number };
 
 export type ViewDef =
   | { kind: 'static'; name: string; pose: Pose }
-  | { kind: 'dynamic'; name: string; mode: 'action' | 'trench' };
+  | { kind: 'dynamic'; name: string; mode: 'action' | 'trench' | 'bastion' };
 
 // The static camera poses (named, order-independent). Tactical is the game's
-// original camera; the other two FOVs match its board coverage (fov ∝ 1/distance)
-// so whatever aspect frames Tactical frames these too.
+// original camera; Overhead's FOV matches its board coverage (fov ∝ 1/distance)
+// so whatever aspect frames Tactical frames it too.
 const POSE_TACTICAL: Pose = { position: [0, 1.62, 1.12], target: [0, 0, 0.04], fov: 44 };
-const POSE_CINEMATIC: Pose = { position: [0, 0.85, 1.32], target: [0, 0.06, -0.06], fov: 54 };
 const POSE_OVERHEAD: Pose = { position: [0, 2.35, 0.42], target: [0, 0, 0], fov: 36 };
 
 /** HUD numbering — button 1..5 maps to VIEWS[0..4]:
- *  1 Overhead (default), 2 Trench, 3 Tactical, 4 Action, 5 Cinematic. */
+ *  1 Overhead (default), 2 Trench, 3 Tactical, 4 Action, 5 Bastion. */
 export const VIEWS: ViewDef[] = [
   { kind: 'static', name: 'Overhead', pose: POSE_OVERHEAD }, // 1 — default top-down
   { kind: 'dynamic', name: 'Trench', mode: 'trench' }, // 2 — low chase behind a wave
   { kind: 'static', name: 'Tactical', pose: POSE_TACTICAL }, // 3 — steep 3/4 overview
   { kind: 'dynamic', name: 'Action', mode: 'action' }, // 4 — close-up on the busiest fight
-  { kind: 'static', name: 'Cinematic', pose: POSE_CINEMATIC }, // 5 — low hero angle
+  { kind: 'dynamic', name: 'Bastion', mode: 'bastion' }, // 5 — behind the Heart, facing the enemies
 ];
 
 /** The view the camera starts on (index into VIEWS). */
@@ -125,13 +124,31 @@ export function actionPose(hotspot: Vec3): Pose {
   };
 }
 
-/** View 5 pose: sit low behind the followed enemy `anchor` (opposite its heading
- * `dir`) and look forward along the trench, so it streams away from the camera. */
+/** View 2 (Trench) pose: sit low behind the followed enemy `anchor` (opposite its
+ * heading `dir`) and look forward along the trench, so it streams away. */
 export function trenchPose(anchor: Vec3, dir: Vec3): Pose {
   return {
     position: [anchor[0] - dir[0] * TRENCH_BEHIND, TRENCH_HEIGHT, anchor[2] - dir[2] * TRENCH_BEHIND],
     target: [anchor[0] + dir[0] * TRENCH_AHEAD, TRENCH_LOOK_Y, anchor[2] + dir[2] * TRENCH_AHEAD],
     fov: TRENCH_FOV,
+  };
+}
+
+// view 5 (Bastion): sit just behind the Heart and look through its dot-cloud
+// toward where the enemies are coming from — the last-stand, defender's-eye angle.
+const BASTION_BEHIND = 0.3; // how far behind the Heart (opposite the threat)
+const BASTION_UP = 0.06; // slightly above the Heart, to look down through it
+const BASTION_AHEAD = 0.5; // look this far past the Heart, toward the enemies
+const BASTION_LOOK_Y = 0.03; // aim near the ground where enemies approach
+const BASTION_FOV = 54;
+
+/** View 5 pose: behind the Heart `heart`, looking through it along `dir` — the
+ * unit XZ direction from the Heart toward the incoming enemies. */
+export function bastionPose(heart: Vec3, dir: Vec3): Pose {
+  return {
+    position: [heart[0] - dir[0] * BASTION_BEHIND, heart[1] + BASTION_UP, heart[2] - dir[2] * BASTION_BEHIND],
+    target: [heart[0] + dir[0] * BASTION_AHEAD, BASTION_LOOK_Y, heart[2] + dir[2] * BASTION_AHEAD],
+    fov: BASTION_FOV,
   };
 }
 
