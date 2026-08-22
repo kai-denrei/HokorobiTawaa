@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { dotTexture } from '../units/unit';
+import { dotLOD } from '../units/proximity';
 import { heartPointsShuffled, breathe, wave } from '../units/heart';
 
 const HURT_DUR = 0.75;
@@ -19,13 +20,15 @@ export class HeartBase {
   private buf: Float32Array;
   private livesFrac = 1;
   private hurtT = 0;
+  private readonly baseSize: number;
 
   constructor(worldX: number, worldZ: number, private scale: number) {
+    this.baseSize = scale * 0.12;
     this.buf = new Float32Array(this.count * 3);
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.buf, 3).setUsage(THREE.DynamicDrawUsage));
     this.mat = new THREE.PointsMaterial({
       color: GREEN.clone(),
-      size: scale * 0.12,
+      size: this.baseSize,
       map: dotTexture(),
       transparent: true,
       depthWrite: false,
@@ -68,6 +71,16 @@ export class HeartBase {
     }
     this.geo.setDrawRange(0, k);
     (this.geo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  /** Distance-based dot LOD, matching the units: shrink + dim when the camera is
+   * close so the heart doesn't blow out to white in the close-up views. Must run
+   * AFTER update() (which resets size/colour each frame): it multiplies the
+   * current colour, so the green/red-flash hue is preserved and just dimmed. */
+  applyLOD(cameraPos: THREE.Vector3 | null): void {
+    const lod = cameraPos ? dotLOD(this.object.position.distanceTo(cameraPos)) : { size: 1, bright: 1 };
+    this.mat.size = this.baseSize * lod.size;
+    if (lod.bright < 1) this.mat.color.multiplyScalar(lod.bright);
   }
 
   dispose(): void {

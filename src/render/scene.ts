@@ -100,6 +100,9 @@ export class BoardView {
   private topPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -WALL_HEIGHT);
   private disposables: { dispose(): void }[] = [];
   private running = false;
+  /** Distance-based dot LOD (shrink + dim dots up close to stop the additive
+   * white blowout). Public so it can be toggled for debug / A-B comparison. */
+  lodEnabled = true;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
@@ -724,8 +727,14 @@ export class BoardView {
       if (this.camTween) this.stepCamTween(dt);
       else if (this.dynamicView) this.stepDynamicView(dt);
       this.stepAura();
-      for (const u of this.units) u.update(dt, elapsed);
-      if (this.baseHeart) this.baseHeart.update(dt, elapsed);
+      for (const u of this.units) {
+        u.update(dt, elapsed);
+        u.applyLOD(this.lodEnabled ? this.camera.position : null); // null → reset dots to full
+      }
+      if (this.baseHeart) {
+        this.baseHeart.update(dt, elapsed);
+        this.baseHeart.applyLOD(this.lodEnabled ? this.camera.position : null); // null → full
+      }
       if (this.rangeTTL > 0) {
         this.rangeTTL -= dt;
         if (this.rangeTTL <= 0) this.hideRange();

@@ -8,6 +8,7 @@ import type { UnitDef, Idle } from './roster';
 import { UP_DAMAGE, UP_RANGE, UP_RATE } from './roster';
 import { intToRgb01 } from '../util/color';
 import { SOLVE_MOVES, solveCycle, applyMoves } from './idle-anim';
+import { dotLOD } from './proximity';
 
 /** Towers animate by upgrade tier: 0 = static, 1 = spin, 2 = twist. Cheap — a
  * spin is an O(1) transform; a twist rewrites the (small) point buffer/frame. */
@@ -67,6 +68,9 @@ export class Unit {
   protected readonly geo: THREE.BufferGeometry;
   protected readonly mat: THREE.PointsMaterial;
   protected readonly baseScale: number;
+  /** Full-distance dot size (the PointsMaterial size); scaled down up close by
+   * applyLOD. Stored so the LOD has a stable base to multiply. */
+  protected readonly baseDotSize: number;
   protected readonly restY: number;
   protected readonly phase: number;
   protected readonly count: number;
@@ -116,9 +120,10 @@ export class Unit {
     this.geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 
     this.baseScale = scale * (def.sizeScale ?? 1);
+    this.baseDotSize = this.baseScale * 0.14;
     this.mat = new THREE.PointsMaterial({
       vertexColors: true,
-      size: this.baseScale * 0.14,
+      size: this.baseDotSize,
       map: dotTexture(),
       transparent: true,
       alphaTest: 0.18,
@@ -252,6 +257,17 @@ export class Unit {
   update(_dt: number, elapsed: number): void {
     this.animateIdle(elapsed);
     this.object.position.y = this.baseY + this.restY + this.bob(elapsed);
+  }
+
+  /** Distance-based dot LOD: shrink + dim this unit's dots when the camera is
+   * close (kills the additive white blowout in close-up views), full size and
+   * brightness at distance. `material.color` multiplies the per-vertex colours,
+   * so the scalar dims brightness while preserving hue. Called by the scene each
+   * frame. */
+  applyLOD(cameraPos: THREE.Vector3 | null): void {
+    const lod = cameraPos ? dotLOD(this.object.position.distanceTo(cameraPos)) : { size: 1, bright: 1 };
+    this.mat.size = this.baseDotSize * lod.size;
+    this.mat.color.setScalar(lod.bright);
   }
 
   dispose(): void {
