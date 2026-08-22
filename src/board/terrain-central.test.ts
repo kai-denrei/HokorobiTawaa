@@ -32,7 +32,7 @@ describe('typeCentralSiege', () => {
     const b = centralBoard(3);
     expect(b.path).toEqual(b.sectors![0]!.route);
     expect(b.altPaths.length).toBe(b.sectors!.length - 1);
-    // closed sectors' interiors are blocked terrain
+    // closed-sector routes can share cells with the (open) main path near the base, so those shared cells legitimately stay 'path'
     for (let i = 1; i < b.sectors!.length; i++) {
       for (const id of b.sectors![i]!.route.slice(1, -1)) {
         expect(['blocked', 'path']).toContain(b.cells.get(id)!.terrain);

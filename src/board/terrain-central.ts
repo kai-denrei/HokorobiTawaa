@@ -93,7 +93,7 @@ export function typeCentralSiege(
     altPaths.push(sectors[i]!.route);
   }
 
-  // spawn/base overwrite endpoints
+  // MUST stay last: spawn/base terrain wins over all earlier paint layers.
   for (const s of sectors) cells.get(s.spawn)!.terrain = 'spawn';
   cells.get(base)!.terrain = 'base';
 
