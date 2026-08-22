@@ -254,7 +254,8 @@ function startEndless(): void {
   overlay.closePalette();
   overlay.hideResult();
   overlay.hideTitle();
-  board = generateEndlessBoard(rand(), { targetCells: boardSize > 240 ? boardSize : 300 });
+  seed = rand();
+  board = generateEndlessBoard(seed, { targetCells: boardSize > 240 ? boardSize : 300 });
   view.setBoard(board); // sectored → frames tight on sector 0 (Task 4)
   view.highlightCell(null);
   setSeedInfo();
