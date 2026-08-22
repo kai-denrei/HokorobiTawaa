@@ -22,7 +22,7 @@ import {
 } from './coords';
 import {
   VIEWS, DEFAULT_VIEW, DEFAULT_POSE, advanceTween, smoothPose,
-  densestCluster, actionPose, trenchPose,
+  densestCluster, actionPose, trenchPose, revealPose,
   ACTION_RADIUS, DYN_TAU, type Pose, type CamTween, type Vec3,
 } from './camera-views';
 
@@ -75,6 +75,9 @@ export class BoardView {
   private camTarget = new THREE.Vector3();
   /** In-flight cinematic camera move between view presets (null when idle). */
   private camTween: CamTween | null = null;
+  /** Central-siege reveal state (Endless): total sectors + first-sector dir. */
+  private revealTotal = 0;
+  private revealFirstDir: Vec3 = [0, 0, 1];
   /** Index of the currently-selected camera view (source of truth for the HUD
    * selector; updated by setView regardless of who triggered it). */
   private currentViewIndex = DEFAULT_VIEW; // view #1 (Overhead)
@@ -158,6 +161,19 @@ export class BoardView {
         this.trenchAcquired = false;
       }
     }
+  }
+
+  /** Endless fraying: open sector `i` (>=1) and pull the camera back to reveal it. */
+  revealSector(i: number): void {
+    if (i < 1 || i > this.revealTotal - 1) return;
+    this.openPath(i - 1); // sectors 1+ map onto altPaths[0..] (tear-open animation)
+    this.camTween = {
+      from: this.currentPose(),
+      to: revealPose(i + 1, this.revealTotal, this.revealFirstDir),
+      t: 0,
+      dur: 1.6,
+    };
+    this.dynamicView = null;
   }
 
   /** Choose the enemy the trench cam follows. Keeps the current target while it's
@@ -262,6 +278,17 @@ export class BoardView {
     // angle the heart to face the camera so its silhouette reads as a ❤
     // (the shape is symmetric front-to-back, so facing either way is fine).
     this.baseHeart.object.lookAt(this.camera.position);
+
+    // Endless central-siege board: frame tight on sector 0's approach.
+    if (board.sectors && board.sectors.length) {
+      this.revealTotal = board.sectors.length;
+      const s0 = board.cells.get(board.sectors[0]!.spawn)!;
+      const w = toWorld(s0.center); // spawn world pos; dir from centre (~origin) to it
+      const len = Math.hypot(w[0], w[2]) || 1;
+      this.revealFirstDir = [w[0] / len, 0, w[2] / len];
+      this.camTween = null;
+      this.applyPose(revealPose(1, this.revealTotal, this.revealFirstDir));
+    }
   }
 
   /** (Re)build only the terrain geometry (boardGroup) from the current board —
