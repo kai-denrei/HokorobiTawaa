@@ -4,8 +4,9 @@
 import type { Board } from './types';
 import { generateCells } from './generate';
 import { typeTerrain, type TerrainParams } from './terrain';
+import { typeCentralSiege } from './terrain-central';
 
-export type { Board, Cell, CellId, TerrainKey, Vec2 } from './types';
+export type { Board, Cell, CellId, TerrainKey, Vec2, Sector } from './types';
 export {
   bfsDistance,
   bfsDistances,
@@ -18,6 +19,8 @@ export { generateCells, extractCells, poissonRadiusFor } from './generate';
 export { typeTerrain } from './terrain';
 export type { TerrainParams } from './terrain';
 export { mulberry32 } from './rng';
+export { typeCentralSiege } from './terrain-central';
+export type { CentralParams } from './terrain-central';
 
 export type GenerateBoardParams = TerrainParams & { targetCells?: number };
 
@@ -29,4 +32,14 @@ export function generateBoard(seed: number, params: GenerateBoardParams = {}): B
   const { targetCells = 120, ...terrain } = params;
   const cells = generateCells(seed, targetCells);
   return typeTerrain(cells, seed, terrain);
+}
+
+/** Central-siege board for Endless mode: heart at centre, rim spawns, sectors. */
+export function generateEndlessBoard(
+  seed: number,
+  params: { targetCells?: number; spawnCount?: number } = {},
+): Board {
+  const { targetCells = 300, spawnCount = 6 } = params;
+  const cells = generateCells(seed, targetCells);
+  return typeCentralSiege(cells, seed, { spawnCount });
 }

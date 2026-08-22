@@ -19,6 +19,9 @@ export type Cell = {
   terrain: TerrainKey;
 };
 
+/** One rim approach in a central-siege board: a spawn and its route to the base. */
+export type Sector = { spawn: CellId; route: CellId[] };
+
 export type Board = {
   /** All playable cells, keyed by stable id (= generation order). */
   cells: Map<CellId, Cell>;
@@ -35,4 +38,8 @@ export type Board = {
    * main path or any open alternate at random. Empty when the board can't fit
    * a distinct alternate corridor. */
   altPaths: CellId[][];
+  /** Central-siege sectors (Endless mode) in reveal order: sector 0 is the
+   * active starting approach; 1+ start closed (interiors 'blocked') and are
+   * opened one per fraying milestone. Undefined for Campaign (linear) boards. */
+  sectors?: Sector[];
 };
