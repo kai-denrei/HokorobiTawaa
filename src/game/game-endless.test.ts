@@ -10,7 +10,12 @@ describe('Game endless mode', () => {
   it('never reports a win and keeps advancing past wave 12', () => {
     const onResult = vi.fn();
     const onFraying = vi.fn();
-    const g = new Game(fakeView(), { onHud: () => {}, onResult, onFraying });
+    const hudWaves: number[] = [];
+    const g = new Game(fakeView(), {
+      onHud: (s) => hudWaves.push(s.wave),
+      onResult,
+      onFraying,
+    });
     g.startEndless(['butterfly', 'ghost']);
     // fast-forward many waves: force each wave to "finish" instantly.
     // Large dt (100s) drains the countdown and exhausts all spawns in one tick
@@ -26,6 +31,9 @@ describe('Game endless mode', () => {
       g.tick(100);
     }
     expect(onResult).not.toHaveBeenCalledWith('won', expect.anything());
-    expect(onFraying).toHaveBeenCalled(); // fired on a wave-5 milestone
+    // Proves it advanced past wave 12 (procedural sourcing engaged)
+    expect(Math.max(...hudWaves)).toBeGreaterThan(12);
+    // Proves multiple fraying milestones fired (waves 5 and 10)
+    expect(onFraying.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
