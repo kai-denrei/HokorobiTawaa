@@ -49,7 +49,7 @@ export class BoardView {
   private boardGroup = new THREE.Group();
   private highlight: THREE.LineSegments | null = null;
   private board: Board | null = null;
-  private mountainStyle: MountainStyle = 'solid';
+  private mountainStyle: MountainStyle = 'wire';
   private unitsGroup = new THREE.Group();
   private units: Unit[] = [];
   private towers: Unit[] = [];
@@ -77,7 +77,7 @@ export class BoardView {
   private camTween: CamTween | null = null;
   /** Index of the currently-selected camera view (source of truth for the HUD
    * selector; updated by setView regardless of who triggered it). */
-  private currentViewIndex = 0;
+  private currentViewIndex = 2; // default to view #3 (Overhead)
   /** When a dynamic view (Action/Trench) is active, the camera follows a pose
    * recomputed every frame from enemy positions; null for the static views. */
   private dynamicView: 'action' | 'trench' | null = null;
@@ -122,10 +122,10 @@ export class BoardView {
     key.position.set(-0.8, 1.2, 0.5);
     this.scene.add(key);
 
-    this.camera = new THREE.PerspectiveCamera(STATIC_POSES[0]!.fov, 1, 0.01, 100);
-    // Start on view 1 — the steep tilted overview that frames the whole
-    // [-0.5,0.5]² board. setView() switches among the views in camera-views.ts.
-    this.applyPose(STATIC_POSES[0]!);
+    this.camera = new THREE.PerspectiveCamera(STATIC_POSES[2]!.fov, 1, 0.01, 100);
+    // Start on view #3 (Overhead) — the default. setView() switches among the
+    // views in camera-views.ts.
+    this.applyPose(STATIC_POSES[2]!);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));

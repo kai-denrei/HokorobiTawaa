@@ -7,6 +7,7 @@
 import { createChrome } from './overlay/chrome';
 import { createPanel } from './overlay/panel';
 import { createRadial, createSheet } from './overlay/menus';
+import { createWaveAnnounce } from './overlay/announce';
 import { createHud, createTitleScreen, createResultScreen } from './overlay/screens';
 import type { Overlay, OverlayHandlers } from './overlay/types';
 
@@ -30,6 +31,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   const radial = createRadial();
   const result = createResultScreen(handlers, panel.openTo);
   const title = createTitleScreen(handlers);
+  const announce = createWaveAnnounce();
 
   // cross-component wiring: the badge opens the panel; Escape closes the panel
   // and any open radial.
@@ -42,7 +44,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   });
 
   // append order sets stacking among equal z-index layers (unchanged).
-  root.append(chrome.top, hud.el, panel.scrim, chrome.bottom, sheet.el, result.el, title.el, radial.el);
+  root.append(chrome.top, hud.el, panel.scrim, chrome.bottom, sheet.el, result.el, title.el, announce.el, radial.el);
 
   return {
     setCellInfo: chrome.setCellInfo,
@@ -57,8 +59,11 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
     setActiveView: chrome.setActiveView,
     showResult: result.show,
     hideResult: result.hide,
+    showWaveAnnounce: announce.show,
+    hideWaveAnnounce: announce.hide,
     showTitle: () => {
       hud.clear();
+      announce.hide(); // no wave card on the landing page
       title.show();
     },
     hideTitle: title.hide,

@@ -36,6 +36,9 @@ export type GameCallbacks = {
   /** Open alternate route `index` (0 after wave 6, 1 after wave 9). No-op in
    * the view if the board has no such alternate. */
   onOpenPath?: (index: number) => void;
+  /** A wave just started: `wave` is 1-based, `newEnemyKeys` are the enemy types
+   * this wave introduces for the first time (empty if none). Drives the animatic. */
+  onWaveStart?: (wave: number, newEnemyKeys: string[]) => void;
 };
 
 type SpawnGroup = { key: string; count: number; interval: number };
@@ -57,8 +60,19 @@ const PATH_OPENINGS: { afterWave: number; index: number }[] = [
   { afterWave: 9, index: 1 },
 ];
 
+/** For each wave (in order), the enemy keys it introduces that no earlier wave
+ * used — i.e. the "new threats" this wave adds. Pure; drives the wave animatic. */
+export function newEnemyTypesByWave(waves: Wave[]): string[][] {
+  const seen = new Set<string>();
+  return waves.map((wave) => {
+    const fresh: string[] = [];
+    for (const g of wave) if (!seen.has(g.key)) { seen.add(g.key); fresh.push(g.key); }
+    return fresh;
+  });
+}
+
 /** Escalating waves that introduce the new behaviours in turn. */
-function buildWaves(): Wave[] {
+export function buildWaves(): Wave[] {
   return [
     [{ key: 'butterfly', count: 10, interval: 0.5 }], // agile intro
     [{ key: 'butterfly', count: 8, interval: 0.45 }, { key: 'ghost', count: 5, interval: 0.7 }],
@@ -77,6 +91,7 @@ function buildWaves(): Wave[] {
 
 export class Game {
   private waves: Wave[] = buildWaves();
+  private newTypes: string[][] = newEnemyTypesByWave(this.waves);
   private lives = START_LIVES;
   private gold = START_GOLD;
   private streak = 0;
@@ -101,6 +116,7 @@ export class Game {
   /** Re-arm for a fresh board (new run: loop 1, full economy reset). */
   reset(): void {
     this.waves = buildWaves();
+    this.newTypes = newEnemyTypesByWave(this.waves);
     this.lives = START_LIVES;
     this.gold = START_GOLD;
     this.streak = 0;
@@ -225,6 +241,7 @@ export class Game {
     this.spawnedInGroup = 0;
     this.spawnTimer = 0;
     this.spawningDone = false;
+    this.cb.onWaveStart?.(this.waveIndex + 1, this.newTypes[this.waveIndex] ?? []);
   }
 
   private stepSpawning(dt: number): void {

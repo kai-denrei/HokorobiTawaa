@@ -521,3 +521,96 @@ html, body {
 .hk-unit:active { transform: translateY(1px); }
 .hk-unit-label { font-size: 13px; }
 .hk-unit-role { font-size: 10px; opacity: 0.55; }
+
+/* ---- new-wave animatic (CRT / hologram enemy intro card) ---- */
+.hk-announce {
+  position: fixed;
+  inset: 0;
+  z-index: 44; /* above board + HUD, below the radial (46) */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  pointer-events: none; /* never blocks tower placement */
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.hk-announce.is-open { opacity: 1; }
+.hk-announce-card {
+  position: relative;
+  min-width: 200px;
+  max-width: 88vw;
+  padding: 12px 20px 16px;
+  background: linear-gradient(180deg, rgba(6, 26, 18, 0.9), rgba(3, 14, 10, 0.9));
+  border: 1px solid var(--hk-green);
+  border-radius: 12px;
+  box-shadow: 0 0 26px rgba(53, 255, 122, 0.35), inset 0 0 34px rgba(53, 255, 122, 0.08);
+  overflow: hidden;
+  transform: translateY(-6px) scale(0.96);
+  transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.25, 1);
+  animation: hk-holo-flicker 3.5s infinite;
+}
+.hk-announce.is-open .hk-announce-card { transform: translateY(0) scale(1); }
+/* CRT scanlines */
+.hk-announce-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 18, 9, 0.45) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  background-size: 100% 4px;
+  animation: hk-holo-roll 0.5s steps(4) infinite;
+}
+/* hologram sweep bar */
+.hk-announce-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 45%;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(53, 255, 122, 0.12), rgba(53, 255, 122, 0));
+  transform: translateY(-120%);
+  animation: hk-holo-sweep 2.8s ease-in-out infinite;
+}
+@keyframes hk-holo-flicker {
+  0%, 88%, 100% { opacity: 1; }
+  90% { opacity: 0.82; }
+  92% { opacity: 1; }
+  95% { opacity: 0.9; }
+  96% { opacity: 1; }
+}
+@keyframes hk-holo-roll {
+  from { background-position: 0 0; }
+  to { background-position: 0 4px; }
+}
+@keyframes hk-holo-sweep {
+  0% { transform: translateY(-120%); }
+  55%, 100% { transform: translateY(320%); }
+}
+.hk-announce-head {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--hk-green);
+  opacity: 0.85;
+  margin-bottom: 8px;
+  text-shadow: 0 0 8px rgba(53, 255, 122, 0.6);
+}
+.hk-announce-grid { display: flex; gap: 18px; justify-content: center; }
+.hk-announce-item { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.hk-announce-canvas { filter: drop-shadow(0 0 6px rgba(53, 255, 122, 0.4)); }
+.hk-announce-name {
+  font-size: 13px;
+  color: var(--hk-green);
+  text-shadow: 0 0 8px rgba(53, 255, 122, 0.5);
+}
+.hk-announce-role { font-size: 10px; opacity: 0.55; }

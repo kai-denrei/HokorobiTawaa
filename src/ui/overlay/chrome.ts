@@ -36,8 +36,8 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
   const regen = el('button', 'hk-btn', '↻ Regenerate');
   regen.addEventListener('click', () => handlers.onRegenerate());
 
-  let mountainSolid = true;
-  const toggle = el('button', 'hk-btn hk-btn-ghost', '⛰ Solid');
+  let mountainSolid = false; // default view is wireframe
+  const toggle = el('button', 'hk-btn hk-btn-ghost', '⛰ Wire');
   toggle.title = 'Toggle mountains: wireframe / solid';
   toggle.addEventListener('click', () => {
     mountainSolid = !mountainSolid;
@@ -54,7 +54,7 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
   const viewBtns = [0, 1, 2, 3, 4].map((i) => {
     const b = el('button', 'hk-view-btn', String(i + 1));
     b.title = `${viewNames[i]} camera view`;
-    if (i === 0) b.classList.add('is-active');
+    if (i === 2) b.classList.add('is-active'); // default view #3 (Overhead)
     // delegate only — the highlight is updated via setActiveView so keyboard and
     // swipe stay in sync through the same path (see the composer / main.ts).
     b.addEventListener('click', () => handlers.onSetView(i));

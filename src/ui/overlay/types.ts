@@ -57,6 +57,10 @@ export type Overlay = {
   setActiveView: (index: number) => void;
   showResult: (won: boolean, stats?: ResultStats) => void;
   hideResult: () => void;
+  /** New-wave animatic: pop up a CRT/hologram card naming the wave's new enemy
+   * type(s). No-op for an empty list. */
+  showWaveAnnounce: (keys: string[]) => void;
+  hideWaveAnnounce: () => void;
   showTitle: () => void;
   hideTitle: () => void;
 };

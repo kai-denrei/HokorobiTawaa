@@ -18,6 +18,12 @@ type Mode = 'attract' | 'play';
 let mode: Mode = 'attract';
 let demoTimer = 0;
 
+// Landing page: cinematically cycle the camera between views #3, #5, #4.
+const ATTRACT_VIEWS = [2, 4, 3]; // indices → view labels 3 (Overhead), 5 (Trench), 4 (Action)
+const ATTRACT_VIEW_PERIOD = 5; // seconds per view
+let attractViewTimer = 0;
+let attractViewIdx = 0;
+
 const rand = (): number => (Math.random() * 0x7fffffff) | 0;
 
 const overlay = createOverlay(app, {
@@ -50,6 +56,7 @@ const game = new Game(view, {
   },
   onResult: (status, stats) => overlay.showResult(status === 'won', stats),
   onOpenPath: (index) => view.openPath(index),
+  onWaveStart: (_wave, keys) => overlay.showWaveAnnounce(keys), // CRT card for new enemy types
 });
 
 view.onTick = (dt) => {
@@ -189,6 +196,13 @@ function demoTick(dt: number): void {
     view.spawnEnemy(key);
     demoTimer = 0.6 + Math.random() * 0.7;
   }
+  // cinematic landing rotation: advance to the next view every few seconds
+  attractViewTimer += dt;
+  if (attractViewTimer >= ATTRACT_VIEW_PERIOD) {
+    attractViewTimer = 0;
+    attractViewIdx = (attractViewIdx + 1) % ATTRACT_VIEWS.length;
+    selectView(ATTRACT_VIEWS[attractViewIdx]!);
+  }
 }
 
 /** Attract mode: autoplay a demo (one of each tower + random enemies) + title. */
@@ -203,6 +217,9 @@ function startAttract(): void {
   overlay.setCellInfo('Attract demo — press PLAY to start.');
   placeDemoTowers();
   demoTimer = 0.3;
+  attractViewTimer = 0;
+  attractViewIdx = 0;
+  selectView(ATTRACT_VIEWS[0]!); // start the rotation on view #3
   overlay.showTitle();
 }
 
@@ -211,6 +228,7 @@ function startPlay(): void {
   mode = 'play';
   overlay.hideTitle();
   view.clearUnits();
+  selectView(2); // settle on the default view #3 for play
   overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
   game.reset();
 }

@@ -21,8 +21,10 @@ function rotY(p: P3, a: number): P3 {
   return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c];
 }
 
-/** Render `def`'s shape into `canvas` at CSS size `size` (px, square). */
-export function drawSprite(canvas: HTMLCanvasElement, def: UnitDef, size = 88): void {
+/** Render `def`'s shape into `canvas` at CSS size `size` (px, square). `spin`
+ * (radians) is added to the Y view angle — pass a rising value each frame to
+ * animate a slow turntable rotation. */
+export function drawSprite(canvas: HTMLCanvasElement, def: UnitDef, size = 88, spin = 0): void {
   const shape = SHAPES[def.shape ?? def.key];
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.round(size * dpr);
@@ -37,8 +39,9 @@ export function drawSprite(canvas: HTMLCanvasElement, def: UnitDef, size = 88): 
   const c1 = intToRgb255(def.color);
   const c2 = def.color2 != null ? intToRgb255(def.color2) : null;
 
-  // static orientation (rotX baked as in-game) then a tilted 3/4 view.
-  const view = { ay: 0.62, ax: 0.5 };
+  // static orientation (rotX baked as in-game) then a tilted 3/4 view; `spin`
+  // rotates the turntable about Y for the animated wave-intro card.
+  const view = { ay: 0.62 + spin, ax: 0.5 };
   const n = shape.count;
   const proj: { x: number; y: number; z: number; c: [number, number, number] }[] = [];
   for (let i = 0; i < n; i++) {
