@@ -57,6 +57,22 @@ html, body {
 }
 .hk-kanji { font-size: 18px; margin-right: 4px; }
 
+/* current-mode label in the top bar (Attract / Campaign / Endless) */
+.hk-mode {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hk-green);
+  opacity: 0.82;
+  padding: 3px 10px;
+  border: 1px solid var(--hk-green-dim);
+  border-radius: 999px;
+  background: rgba(3, 20, 10, 0.6);
+  text-shadow: 0 0 8px rgba(53, 255, 122, 0.4);
+  white-space: nowrap;
+}
+.hk-mode:empty { display: none; }
+
 .hk-badge {
   display: inline-flex;
   align-items: center;

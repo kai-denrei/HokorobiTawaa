@@ -48,6 +48,8 @@ export type TowerMenuInfo = {
 export type Overlay = {
   setCellInfo: (text: string) => void;
   setSeedInfo: (text: string) => void;
+  /** Set the top-bar mode label (Attract / Campaign / Endless). */
+  setMode: (text: string) => void;
   openPalette: (title: string, items: PaletteItem[], onPick: (key: string) => void) => void;
   openTowerMenu: (info: TowerMenuInfo, on: { onUpgrade: () => void; onSell: () => void }) => void;
   openRadial: (cx: number, cy: number, items: RadialItem[], h: RadialHandlers) => void;

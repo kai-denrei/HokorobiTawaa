@@ -49,6 +49,7 @@ export function createOverlay(root: HTMLElement, handlers: OverlayHandlers): Ove
   return {
     setCellInfo: chrome.setCellInfo,
     setSeedInfo: chrome.setSeedInfo,
+    setMode: chrome.setMode,
     openPalette: sheet.openPalette,
     openTowerMenu: sheet.openTowerMenu,
     openRadial: radial.open,

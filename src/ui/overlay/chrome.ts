@@ -16,6 +16,8 @@ export type Chrome = {
   setSeedInfo: (text: string) => void;
   /** Highlight the active camera preset (0..2) in the segmented selector. */
   setActiveView: (index: number) => void;
+  /** Set the mode label shown in the top bar (e.g. Attract / Campaign / Endless). */
+  setMode: (text: string) => void;
 };
 
 export function createChrome(handlers: OverlayHandlers): Chrome {
@@ -23,11 +25,12 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
   const top = el('div', 'hk-top');
   const title = el('div', 'hk-title');
   title.innerHTML = '<span class="hk-kanji">綻</span> HokorobiTawaa <span class="hk-kanji">塔</span>';
+  const mode = el('div', 'hk-mode', ''); // current mode label (Attract / Campaign / Endless)
   const badge = el('button', 'hk-badge');
   badge.innerHTML = `${versionGlyphsHTML(BUILD.token)}v${BUILD.version}<span class="hk-badge-token">${BUILD.token}</span>`;
   applyGlyphFavicon(BUILD.token); // tab icon = the build's glyph (cache-bust check)
   badge.title = 'Build version — open Dev Log & Rules';
-  top.append(title, badge);
+  top.append(title, mode, badge);
 
   // --- bottom bar --------------------------------------------------------
   const bottom = el('div', 'hk-bottom');
@@ -78,5 +81,6 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
     setCellInfo: (text) => { info.textContent = text; },
     setSeedInfo: (text) => { seedInfo.textContent = text; },
     setActiveView,
+    setMode: (text) => { mode.textContent = text; },
   };
 }

@@ -216,6 +216,7 @@ function startAttract(): void {
   view.setBoard(board);
   view.highlightCell(null);
   setSeedInfo();
+  overlay.setMode('Attract');
   overlay.setCellInfo('Attract demo — press PLAY to start.');
   placeDemoTowers();
   demoTimer = 0.3;
@@ -230,6 +231,7 @@ function startPlay(): void {
   mode = 'play';
   overlay.hideTitle();
   view.clearUnits();
+  overlay.setMode('Campaign');
   selectView(0); // settle on the default view #1 (Overhead) for play
   overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
   game.reset();
@@ -244,6 +246,7 @@ function newPlayBoard(): void {
   view.setBoard(board);
   view.highlightCell(null);
   setSeedInfo();
+  overlay.setMode('Campaign');
   overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
   game.reset();
 }
@@ -256,9 +259,11 @@ function startEndless(): void {
   overlay.hideTitle();
   seed = rand();
   board = generateEndlessBoard(seed, { targetCells: boardSize > 240 ? boardSize : 300 });
-  view.setBoard(board); // sectored → frames tight on sector 0 (Task 4)
+  view.setBoard(board);
   view.highlightCell(null);
+  selectView(0); // start on view #1 (Overhead) — see the whole central board
   setSeedInfo();
+  overlay.setMode('Endless');
   overlay.setCellInfo('Endless — hold the Heart. It will come apart around you.');
   game.startEndless(ENEMIES.map((e) => e.key));
 }
