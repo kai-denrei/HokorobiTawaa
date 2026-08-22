@@ -42,7 +42,7 @@ export type GameCallbacks = {
   onWaveApproaching?: (wave: number, newEnemyKeys: string[]) => void;
 };
 
-type SpawnGroup = { key: string; count: number; interval: number };
+export type SpawnGroup = { key: string; count: number; interval: number };
 type Wave = SpawnGroup[];
 
 const START_LIVES = 15;
