@@ -44,8 +44,9 @@ export type GameCallbacks = {
    * can build anticipation. `wave` is 1-based; `newEnemyKeys` are the types this
    * wave introduces for the first time (empty if none / on Continue loops). */
   onWaveApproaching?: (wave: number, newEnemyKeys: string[]) => void;
-  /** Endless: reveal the next sector (>=1) at a fraying milestone. */
-  onFraying?: (sectorIndex: number) => void;
+  /** Endless: a new lane frayed open — reveal sector `sectorIndex` (>=1); the
+   * `reinforcement` gold has just been granted so the UI can announce it. */
+  onFraying?: (sectorIndex: number, reinforcement: number) => void;
 };
 
 export type SpawnGroup = { key: string; count: number; interval: number };
@@ -55,6 +56,14 @@ const START_LIVES = 15;
 const START_DELAY = 8; // seconds before wave 1 (place your towers)
 const BETWEEN_DELAY = 6; // seconds between waves
 const ANNOUNCE_LEAD = 4; // seconds before a wave to pop the "new threats" card
+// Endless fraying pace + economy. The first extra lane opens at FRAY_FIRST_WAVE,
+// then every FRAY_EVERY waves (gives economy runway before each new front). Each
+// opening grants reinforcement gold (base + per-wave) so the new lane can be
+// staffed without gutting the others.
+const FRAY_FIRST_WAVE = 8;
+const FRAY_EVERY = 7;
+const REINFORCE_BASE = 130;
+const REINFORCE_PER_WAVE = 8;
 
 /** Per-wave HP multiplier, applied to base enemy HP. */
 const HP_SCALE = [1.0, 1.1, 1.2, 1.32, 1.44, 1.56, 1.7, 1.9, 2.1, 2.35, 2.6, 3.0];
@@ -112,6 +121,7 @@ export class Game {
   private countdown = START_DELAY;
   private endless = false;
   private enemyKeys: string[] = [];
+  private endlessSectors = 1; // total sectors on the endless board (1 = no extra lanes)
 
   // active-wave spawn cursor
   private groupIndex = 0;
@@ -167,10 +177,11 @@ export class Game {
 
   /** Begin an Endless run: authored waves 1-12 as the ramp, procedural after,
    * never wins (result only on lives-out). `enemyKeys` seeds procedural waves. */
-  startEndless(enemyKeys: string[]): void {
+  startEndless(enemyKeys: string[], sectorCount = 1): void {
     this.reset();
     this.endless = true;
     this.enemyKeys = enemyKeys;
+    this.endlessSectors = Math.max(1, sectorCount);
   }
 
   /** One enemy reached the base: lose a life and reset the kill streak. */
@@ -277,9 +288,17 @@ export class Game {
     if (this.endless && this.waveIndex >= this.waves.length) {
       this.waves[this.waveIndex] = endlessWave(this.waveIndex, this.enemyKeys);
     }
-    // Fraying cadence: every 5th wave reveals the next sector (1-based sector idx).
-    if (this.endless && (this.waveIndex + 1) % 5 === 0) {
-      this.cb.onFraying?.((this.waveIndex + 1) / 5);
+    // Fraying: first extra lane at FRAY_FIRST_WAVE, then every FRAY_EVERY waves —
+    // only for lanes that exist. Each opening grants reinforcement gold so the new
+    // front can be staffed without cannibalising the others.
+    const wave = this.waveIndex + 1;
+    if (this.endless && wave >= FRAY_FIRST_WAVE && (wave - FRAY_FIRST_WAVE) % FRAY_EVERY === 0) {
+      const sector = (wave - FRAY_FIRST_WAVE) / FRAY_EVERY + 1;
+      if (sector <= this.endlessSectors - 1) {
+        const reinforcement = REINFORCE_BASE + wave * REINFORCE_PER_WAVE;
+        this.gold += reinforcement;
+        this.cb.onFraying?.(sector, reinforcement);
+      }
     }
     this.status = 'active';
     this.groupIndex = 0;

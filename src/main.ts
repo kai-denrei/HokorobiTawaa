@@ -62,7 +62,10 @@ const game = new Game(view, {
   onResult: (status, stats) => overlay.showResult(status === 'won', stats),
   onOpenPath: (index) => view.openPath(index),
   onWaveApproaching: (_wave, keys) => overlay.showWaveAnnounce(keys), // CRT card ~4s before the wave
-  onFraying: (i) => view.revealSector(i),
+  onFraying: (i, gold) => {
+    view.revealSector(i);
+    overlay.setCellInfo(`A new lane tears open — reinforcements +◆${gold}`);
+  },
 });
 
 view.onTick = (dt) => {
@@ -272,7 +275,7 @@ function startEndless(): void {
   setSeedInfo();
   overlay.setMode('Endless');
   overlay.setCellInfo('Endless — hold the Heart. It will come apart around you.');
-  game.startEndless(ENEMIES.map((e) => e.key));
+  game.startEndless(ENEMIES.map((e) => e.key), board.sectors?.length ?? 1);
 }
 
 startAttract();
