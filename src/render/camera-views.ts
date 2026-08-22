@@ -134,3 +134,24 @@ export function trenchPose(anchor: Vec3, dir: Vec3): Pose {
     fov: TRENCH_FOV,
   };
 }
+
+// Endless reveal: camera pulls up/back over the centre (the Heart) as sectors
+// reveal. Early it sits low and offset toward the first sector so that approach
+// fills the frame; late it is a high, centred overhead of the whole board.
+const REVEAL_Y_NEAR = 1.15;
+const REVEAL_Y_FAR = 2.5;
+const REVEAL_OFFSET_NEAR = 0.9; // how far the camera is pushed toward firstDir early
+const REVEAL_FOV = 46;
+
+/** Camera pose for the reveal progression. `revealed` >= 1; `firstDir` is the
+ * unit XZ direction from centre to sector 0's spawn. */
+export function revealPose(revealed: number, total: number, firstDir: Vec3): Pose {
+  const t = total <= 1 ? 1 : Math.min(1, (revealed - 1) / (total - 1)); // 0 at first, 1 when all shown
+  const y = REVEAL_Y_NEAR + (REVEAL_Y_FAR - REVEAL_Y_NEAR) * t;
+  const offset = REVEAL_OFFSET_NEAR * (1 - t); // shrinks to 0 (centred) as it pulls back
+  return {
+    position: [firstDir[0] * offset, y, firstDir[2] * offset],
+    target: [0, 0, 0],
+    fov: REVEAL_FOV,
+  };
+}

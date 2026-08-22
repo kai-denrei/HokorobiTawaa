@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   VIEWS, DEFAULT_VIEW, DEFAULT_POSE, ease, poseAt, advanceTween, smoothPose,
-  densestCluster, actionPose, trenchPose,
+  densestCluster, actionPose, trenchPose, revealPose,
   type Pose, type CamTween, type Vec3,
 } from './camera-views';
 
@@ -96,6 +96,25 @@ describe('trenchPose (view 5)', () => {
     expect(p.target[2]).toBeGreaterThan(0); // looking ahead (+z), where they're going
     expect(p.position[1]).toBeLessThan(0.12); // low to the ground — inside the trench
     expect(p.fov).toBeGreaterThan(54); // wider than the default → immersive
+  });
+});
+
+describe('revealPose', () => {
+  const dir: Vec3 = [0, 0, 1];
+  it('starts low and offset toward the first sector', () => {
+    const p = revealPose(1, 6, dir);
+    expect(p.position[1]).toBeLessThan(1.6); // low-ish at the start
+    expect(p.target[0]).toBeCloseTo(0, 6);
+    expect(p.target[2]).toBeCloseTo(0, 6); // looks at the centre (Heart)
+    expect(Math.sign(p.position[2])).toBe(1); // pushed toward +z (firstDir side)
+  });
+  it('pulls back (higher) as more sectors reveal', () => {
+    expect(revealPose(6, 6, dir).position[1]).toBeGreaterThan(revealPose(1, 6, dir).position[1]);
+  });
+  it('ends high and centred overhead', () => {
+    const p = revealPose(6, 6, dir);
+    expect(p.position[1]).toBeGreaterThan(2.0);
+    expect(Math.hypot(p.position[0], p.position[2])).toBeLessThan(0.6); // near-centred
   });
 });
 
