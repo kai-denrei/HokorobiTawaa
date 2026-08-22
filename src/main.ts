@@ -16,6 +16,9 @@ let selectedTower: number | null = null; // last-tapped tower cell (W / ↑ upgr
 
 type Mode = 'attract' | 'play';
 let mode: Mode = 'attract';
+// Which kind of run is active while mode === 'play' (both Campaign and Endless
+// run as 'play'). Lets Regenerate rebuild the CURRENT mode, not always Campaign.
+let playKind: 'campaign' | 'endless' = 'campaign';
 let demoTimer = 0;
 
 // Landing page: cinematically cycle the camera between views #3, #5, #4.
@@ -30,6 +33,7 @@ const overlay = createOverlay(app, {
   onRegenerate: () => {
     seed = rand();
     if (mode === 'attract') startAttract();
+    else if (playKind === 'endless') startEndless();
     else newPlayBoard();
   },
   onToggleMountains: (style) => view.setMountainStyle(style),
@@ -229,6 +233,7 @@ function startAttract(): void {
 /** PLAY: clear the demo units and start the real game on the current board. */
 function startPlay(): void {
   mode = 'play';
+  playKind = 'campaign';
   overlay.hideTitle();
   view.clearUnits();
   overlay.setMode('Campaign');
@@ -239,6 +244,7 @@ function startPlay(): void {
 
 function newPlayBoard(): void {
   mode = 'play';
+  playKind = 'campaign';
   overlay.closePalette();
   overlay.hideResult();
   overlay.hideTitle();
@@ -254,6 +260,7 @@ function newPlayBoard(): void {
 /** Endless mode: central-siege board, procedural waves, unravels over time. */
 function startEndless(): void {
   mode = 'play'; // reuse the play input path (tap-to-build, game.tick)
+  playKind = 'endless';
   overlay.closePalette();
   overlay.hideResult();
   overlay.hideTitle();
