@@ -1,7 +1,7 @@
 import './ui/styles.css';
 import { BoardView } from './render/scene';
 import { createOverlay, BOARD_SIZE, type RadialItem } from './ui/overlay';
-import { generateBoard, type Board } from './board';
+import { generateBoard, generateEndlessBoard, type Board } from './board';
 import { TOWERS, ENEMIES } from './units/roster';
 import { Game } from './game/game';
 
@@ -35,6 +35,7 @@ const overlay = createOverlay(app, {
   onToggleMountains: (style) => view.setMountainStyle(style),
   onSetView: (index) => selectView(index),
   onPlay: () => startPlay(),
+  onEndless: () => startEndless(),
   onBoardSize: (n) => {
     boardSize = n;
     // Regenerate immediately only in attract mode; a live run keeps its board
@@ -57,6 +58,7 @@ const game = new Game(view, {
   onResult: (status, stats) => overlay.showResult(status === 'won', stats),
   onOpenPath: (index) => view.openPath(index),
   onWaveApproaching: (_wave, keys) => overlay.showWaveAnnounce(keys), // CRT card ~4s before the wave
+  onFraying: (i) => view.revealSector(i),
 });
 
 view.onTick = (dt) => {
@@ -244,6 +246,20 @@ function newPlayBoard(): void {
   setSeedInfo();
   overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
   game.reset();
+}
+
+/** Endless mode: central-siege board, procedural waves, unravels over time. */
+function startEndless(): void {
+  mode = 'play'; // reuse the play input path (tap-to-build, game.tick)
+  overlay.closePalette();
+  overlay.hideResult();
+  overlay.hideTitle();
+  board = generateEndlessBoard(rand(), { targetCells: boardSize > 240 ? boardSize : 300 });
+  view.setBoard(board); // sectored → frames tight on sector 0 (Task 4)
+  view.highlightCell(null);
+  setSeedInfo();
+  overlay.setCellInfo('Endless — hold the Heart. It will come apart around you.');
+  game.startEndless(ENEMIES.map((e) => e.key));
 }
 
 startAttract();

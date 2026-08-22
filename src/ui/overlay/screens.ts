@@ -43,8 +43,10 @@ export function createTitleScreen(handlers: OverlayHandlers): Screen {
   const titleTag = el('div', 'hk-title-tag', 'Procedural Stalberg Grid Tower Defense');
   const playBtn = el('button', 'hk-play', '▶ PLAY');
   playBtn.addEventListener('click', () => handlers.onPlay());
+  const endlessBtn = el('button', 'hk-play hk-play-endless', '∞ ENDLESS');
+  endlessBtn.addEventListener('click', () => handlers.onEndless());
   const titleDemo = el('div', 'hk-title-demo', '· demo running ·');
-  titleInner.append(titleName, titleTag, playBtn, titleDemo);
+  titleInner.append(titleName, titleTag, playBtn, endlessBtn, titleDemo);
   titleScreen.append(titleInner);
   return {
     el: titleScreen,

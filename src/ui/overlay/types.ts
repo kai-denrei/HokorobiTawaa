@@ -71,6 +71,8 @@ export type OverlayHandlers = {
   /** Switch to camera preset `index` (0..2) with a cinematic transition. */
   onSetView: (index: number) => void;
   onPlay: () => void;
+  /** Start an Endless run. */
+  onEndless: () => void;
   /** Maze target-cell count changed (applied on release). */
   onBoardSize?: (cells: number) => void;
   /** Continue after a victory into the next, harder loop. */

@@ -337,6 +337,7 @@ html, body {
   box-shadow: 0 0 26px rgba(53,255,122,0.45);
 }
 .hk-play:active { transform: translateY(1px); }
+.hk-play-endless { margin-top: 8px; font-size: 15px; opacity: 0.92; }
 .hk-title-demo { font-size: 11px; letter-spacing: 0.14em; color: var(--hk-green); opacity: 0.4; margin-top: 16px; }
 
 /* ---- health widget (heart meter) ---- */
