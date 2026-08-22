@@ -24,6 +24,7 @@ export type HudData = {
   score: number;
   message: string;
   status: string;
+  endless: boolean;
 };
 
 /** End-of-run stats for the result screen (mirrors game RunStats). */
@@ -32,6 +33,8 @@ export type ResultStats = {
   kills: number;
   loop: number;
   killsByType: Record<string, number>;
+  reachedWave: number;
+  endless: boolean;
 };
 
 export type TowerMenuInfo = {

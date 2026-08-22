@@ -20,6 +20,7 @@ export type HudState = {
   score: number; // cumulative kill value (bounty × mult), never spent
   status: GameStatus;
   message: string;
+  endless: boolean;
 };
 
 /** End-of-run stats for the result screen. */
@@ -29,6 +30,8 @@ export type RunStats = {
   loop: number;
   /** enemy unit-key → count killed this run (across loops). */
   killsByType: Record<string, number>;
+  reachedWave: number;
+  endless: boolean;
 };
 
 export type GameCallbacks = {
@@ -197,7 +200,14 @@ export class Game {
   private runStats(): RunStats {
     let kills = 0;
     for (const k in this.killsByType) kills += this.killsByType[k]!;
-    return { score: this.score, kills, loop: this.loop, killsByType: { ...this.killsByType } };
+    return {
+      score: this.score,
+      kills,
+      loop: this.loop,
+      killsByType: { ...this.killsByType },
+      reachedWave: Math.max(0, this.waveIndex + 1),
+      endless: this.endless,
+    };
   }
 
   multiplier(): number {
@@ -325,6 +335,7 @@ export class Game {
       score: this.score,
       status: this.status,
       message,
+      endless: this.endless,
     });
   }
 }

@@ -23,7 +23,7 @@ export function createHud(): Hud {
       `<span class="hk-lives${low}">♥ ${data.lives}</span>` +
       `<span class="hk-credit"><span class="hk-credit-label">CREDIT</span>◆ ${data.gold}</span>` +
       `<span class="hk-mult">×${data.mult.toFixed(1)}</span>` +
-      `<span class="hk-wave">W ${data.wave}/${data.totalWaves}</span>` +
+      `<span class="hk-wave">W ${data.endless ? data.wave : `${data.wave}/${data.totalWaves}`}</span>` +
       loopTag +
       `<span class="hk-score">★ ${data.score}</span>` +
       `<span class="hk-msg">${data.message}</span>`;
@@ -109,8 +109,12 @@ export function createResultScreen(handlers: OverlayHandlers, openTo: (t: Tab) =
     show: (won, stats) => {
       resultTitle.textContent = won ? 'VICTORY' : 'GAME OVER';
       resultTitle.classList.toggle('is-won', won);
-      const blurb = won ? 'All 12 waves cleared. Continue for a harder loop.' : 'The base was overrun.';
-      resultSub.textContent = stats ? `${blurb}  ·  Score ${stats.score}` : blurb;
+      if (stats?.endless) {
+        resultSub.textContent = `Reached wave ${stats.reachedWave}  ·  Score ${stats.score}`;
+      } else {
+        const blurb = won ? 'All 12 waves cleared. Continue for a harder loop.' : 'The base was overrun.';
+        resultSub.textContent = stats ? `${blurb}  ·  Score ${stats.score}` : blurb;
+      }
       if (stats) buildHist(stats); else resultHist.innerHTML = '';
       resultContinue.style.display = won ? '' : 'none';
       result.classList.add('is-open');
