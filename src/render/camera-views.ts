@@ -17,22 +17,27 @@ export type ViewDef =
   | { kind: 'static'; name: string; pose: Pose }
   | { kind: 'dynamic'; name: string; mode: 'action' | 'trench' };
 
-/** The three static shots. View 1 is the game's original camera verbatim; views
- * 2/3 pick other distances but their FOVs match view 1's board coverage
- * (fov ∝ 1/distance) so whatever aspect frames view 1 frames these too. */
-export const STATIC_POSES: Pose[] = [
-  { position: [0, 1.62, 1.12], target: [0, 0, 0.04], fov: 44 }, // 1 Tactical
-  { position: [0, 0.85, 1.32], target: [0, 0.06, -0.06], fov: 54 }, // 2 Cinematic
-  { position: [0, 2.35, 0.42], target: [0, 0, 0], fov: 36 }, // 3 Overhead
+// The static camera poses (named, order-independent). Tactical is the game's
+// original camera; the other two FOVs match its board coverage (fov ∝ 1/distance)
+// so whatever aspect frames Tactical frames these too.
+const POSE_TACTICAL: Pose = { position: [0, 1.62, 1.12], target: [0, 0, 0.04], fov: 44 };
+const POSE_CINEMATIC: Pose = { position: [0, 0.85, 1.32], target: [0, 0.06, -0.06], fov: 54 };
+const POSE_OVERHEAD: Pose = { position: [0, 2.35, 0.42], target: [0, 0, 0], fov: 36 };
+
+/** HUD numbering — button 1..5 maps to VIEWS[0..4]:
+ *  1 Overhead (default), 2 Trench, 3 Tactical, 4 Action, 5 Cinematic. */
+export const VIEWS: ViewDef[] = [
+  { kind: 'static', name: 'Overhead', pose: POSE_OVERHEAD }, // 1 — default top-down
+  { kind: 'dynamic', name: 'Trench', mode: 'trench' }, // 2 — low chase behind a wave
+  { kind: 'static', name: 'Tactical', pose: POSE_TACTICAL }, // 3 — steep 3/4 overview
+  { kind: 'dynamic', name: 'Action', mode: 'action' }, // 4 — close-up on the busiest fight
+  { kind: 'static', name: 'Cinematic', pose: POSE_CINEMATIC }, // 5 — low hero angle
 ];
 
-export const VIEWS: ViewDef[] = [
-  { kind: 'static', name: 'Tactical', pose: STATIC_POSES[0]! },
-  { kind: 'static', name: 'Cinematic', pose: STATIC_POSES[1]! },
-  { kind: 'static', name: 'Overhead', pose: STATIC_POSES[2]! },
-  { kind: 'dynamic', name: 'Action', mode: 'action' }, // 4 close-up on the busiest fight
-  { kind: 'dynamic', name: 'Trench', mode: 'trench' }, // 5 low chase behind a wave
-];
+/** The view the camera starts on (index into VIEWS). */
+export const DEFAULT_VIEW = 0;
+/** Pose for the default view; the scene initialises the camera to this. */
+export const DEFAULT_POSE: Pose = POSE_OVERHEAD;
 
 // ---- easing / interpolation (static tweens) -------------------------------
 

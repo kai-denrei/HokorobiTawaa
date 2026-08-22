@@ -21,7 +21,7 @@ import {
   appendBlockWire, appendBlockSolid,
 } from './coords';
 import {
-  VIEWS, STATIC_POSES, advanceTween, smoothPose,
+  VIEWS, DEFAULT_VIEW, DEFAULT_POSE, advanceTween, smoothPose,
   densestCluster, actionPose, trenchPose,
   ACTION_RADIUS, DYN_TAU, type Pose, type CamTween, type Vec3,
 } from './camera-views';
@@ -77,7 +77,7 @@ export class BoardView {
   private camTween: CamTween | null = null;
   /** Index of the currently-selected camera view (source of truth for the HUD
    * selector; updated by setView regardless of who triggered it). */
-  private currentViewIndex = 2; // default to view #3 (Overhead)
+  private currentViewIndex = DEFAULT_VIEW; // view #1 (Overhead)
   /** When a dynamic view (Action/Trench) is active, the camera follows a pose
    * recomputed every frame from enemy positions; null for the static views. */
   private dynamicView: 'action' | 'trench' | null = null;
@@ -122,10 +122,10 @@ export class BoardView {
     key.position.set(-0.8, 1.2, 0.5);
     this.scene.add(key);
 
-    this.camera = new THREE.PerspectiveCamera(STATIC_POSES[2]!.fov, 1, 0.01, 100);
-    // Start on view #3 (Overhead) — the default. setView() switches among the
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_POSE.fov, 1, 0.01, 100);
+    // Start on the default view (#1, Overhead). setView() switches among the
     // views in camera-views.ts.
-    this.applyPose(STATIC_POSES[2]!);
+    this.applyPose(DEFAULT_POSE);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));

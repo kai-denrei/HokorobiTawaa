@@ -36,9 +36,10 @@ export type GameCallbacks = {
   /** Open alternate route `index` (0 after wave 6, 1 after wave 9). No-op in
    * the view if the board has no such alternate. */
   onOpenPath?: (index: number) => void;
-  /** A wave just started: `wave` is 1-based, `newEnemyKeys` are the enemy types
-   * this wave introduces for the first time (empty if none). Drives the animatic. */
-  onWaveStart?: (wave: number, newEnemyKeys: string[]) => void;
+  /** Fires shortly BEFORE a wave begins (during the pre-wave countdown) so the UI
+   * can build anticipation. `wave` is 1-based; `newEnemyKeys` are the types this
+   * wave introduces for the first time (empty if none / on Continue loops). */
+  onWaveApproaching?: (wave: number, newEnemyKeys: string[]) => void;
 };
 
 type SpawnGroup = { key: string; count: number; interval: number };
@@ -47,6 +48,7 @@ type Wave = SpawnGroup[];
 const START_LIVES = 15;
 const START_DELAY = 8; // seconds before wave 1 (place your towers)
 const BETWEEN_DELAY = 6; // seconds between waves
+const ANNOUNCE_LEAD = 4; // seconds before a wave to pop the "new threats" card
 
 /** Per-wave HP multiplier, applied to base enemy HP. */
 const HP_SCALE = [1.0, 1.1, 1.2, 1.32, 1.44, 1.56, 1.7, 1.9, 2.1, 2.35, 2.6, 3.0];
@@ -98,6 +100,7 @@ export class Game {
   private score = 0;
   private killsByType: Record<string, number> = {};
   private waveIndex = -1;
+  private announcedWave = -1; // upcoming wave index already announced (fire-once guard)
   private loop = 1;
   private status: GameStatus = 'ready';
   private countdown = START_DELAY;
@@ -123,6 +126,7 @@ export class Game {
     this.score = 0;
     this.killsByType = {};
     this.waveIndex = -1;
+    this.announcedWave = -1;
     this.loop = 1;
     this.status = 'ready';
     this.countdown = START_DELAY;
@@ -142,6 +146,7 @@ export class Game {
     this.lives = START_LIVES;
     this.streak = 0;
     this.waveIndex = -1;
+    this.announcedWave = -1;
     this.status = 'ready';
     this.countdown = BETWEEN_DELAY;
     this.groupIndex = 0;
@@ -211,6 +216,14 @@ export class Game {
 
     if (this.status === 'ready') {
       this.countdown -= dt;
+      // Pop the "new threats" card a few seconds ahead of the wave (once each),
+      // building anticipation before it actually starts.
+      const upcoming = this.waveIndex + 1;
+      if (upcoming < this.waves.length && this.announcedWave !== upcoming && this.countdown <= ANNOUNCE_LEAD) {
+        this.announcedWave = upcoming;
+        const fresh = this.loop === 1 ? (this.newTypes[upcoming] ?? []) : [];
+        this.cb.onWaveApproaching?.(upcoming + 1, fresh);
+      }
       if (this.countdown <= 0) this.startNextWave();
       this.emitHud();
       return;
@@ -241,10 +254,7 @@ export class Game {
     this.spawnedInGroup = 0;
     this.spawnTimer = 0;
     this.spawningDone = false;
-    // Only announce "new threats" on the first loop; on Continue loops the types
-    // aren't new to the player, so pass none (the card no-ops on an empty list).
-    const fresh = this.loop === 1 ? (this.newTypes[this.waveIndex] ?? []) : [];
-    this.cb.onWaveStart?.(this.waveIndex + 1, fresh);
+    // (the new-threats card is fired during the pre-wave countdown; see tick)
   }
 
   private stepSpawning(dt: number): void {

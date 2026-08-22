@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  VIEWS, STATIC_POSES, ease, poseAt, advanceTween, smoothPose,
+  VIEWS, DEFAULT_VIEW, DEFAULT_POSE, ease, poseAt, advanceTween, smoothPose,
   densestCluster, actionPose, trenchPose,
   type Pose, type CamTween, type Vec3,
 } from './camera-views';
@@ -100,14 +100,20 @@ describe('trenchPose (view 5)', () => {
 });
 
 describe('VIEWS', () => {
-  it('exposes five views: three static then two dynamic', () => {
+  it('exposes the five views in HUD-number order (1 Overhead … 5 Cinematic)', () => {
     expect(VIEWS).toHaveLength(5);
-    expect(VIEWS.slice(0, 3).every((v) => v.kind === 'static')).toBe(true);
-    expect(VIEWS[3]).toMatchObject({ kind: 'dynamic', mode: 'action' });
-    expect(VIEWS[4]).toMatchObject({ kind: 'dynamic', mode: 'trench' });
+    expect(VIEWS.map((v) => v.name)).toEqual(['Overhead', 'Trench', 'Tactical', 'Action', 'Cinematic']);
+    expect(VIEWS[1]).toMatchObject({ kind: 'dynamic', mode: 'trench' }); // #2
+    expect(VIEWS[3]).toMatchObject({ kind: 'dynamic', mode: 'action' }); // #4
   });
-  it('view 1 is the original default framing (no regression)', () => {
-    expect(STATIC_POSES[0]).toEqual({ position: [0, 1.62, 1.12], target: [0, 0, 0.04], fov: 44 });
-    expect(VIEWS[0]).toMatchObject({ kind: 'static', pose: STATIC_POSES[0] });
+  it('defaults to Overhead (#1) and preserves the original Tactical pose at #3', () => {
+    expect(DEFAULT_VIEW).toBe(0);
+    expect(VIEWS[DEFAULT_VIEW]).toMatchObject({ kind: 'static', name: 'Overhead' });
+    expect(DEFAULT_POSE).toEqual({ position: [0, 2.35, 0.42], target: [0, 0, 0], fov: 36 }); // Overhead
+    expect(VIEWS[2]).toMatchObject({
+      kind: 'static',
+      name: 'Tactical',
+      pose: { position: [0, 1.62, 1.12], target: [0, 0, 0.04], fov: 44 }, // the original camera
+    });
   });
 });

@@ -19,7 +19,7 @@ let mode: Mode = 'attract';
 let demoTimer = 0;
 
 // Landing page: cinematically cycle the camera between views #3, #5, #4.
-const ATTRACT_VIEWS = [2, 4, 3]; // indices → view labels 3 (Overhead), 5 (Trench), 4 (Action)
+const ATTRACT_VIEWS = [0, 1, 3]; // Overhead (#1) → Trench (#2) → Action (#4) — cinematic landing cycle
 const ATTRACT_VIEW_PERIOD = 5; // seconds per view
 let attractViewTimer = 0;
 let attractViewIdx = 0;
@@ -56,7 +56,7 @@ const game = new Game(view, {
   },
   onResult: (status, stats) => overlay.showResult(status === 'won', stats),
   onOpenPath: (index) => view.openPath(index),
-  onWaveStart: (_wave, keys) => overlay.showWaveAnnounce(keys), // CRT card for new enemy types
+  onWaveApproaching: (_wave, keys) => overlay.showWaveAnnounce(keys), // CRT card ~4s before the wave
 });
 
 view.onTick = (dt) => {
@@ -219,7 +219,7 @@ function startAttract(): void {
   demoTimer = 0.3;
   attractViewTimer = 0;
   attractViewIdx = 0;
-  selectView(ATTRACT_VIEWS[0]!); // start the rotation on view #3
+  selectView(ATTRACT_VIEWS[0]!); // start the rotation on view #1 (Overhead)
   overlay.showTitle();
 }
 
@@ -228,7 +228,7 @@ function startPlay(): void {
   mode = 'play';
   overlay.hideTitle();
   view.clearUnits();
-  selectView(2); // settle on the default view #3 for play
+  selectView(0); // settle on the default view #1 (Overhead) for play
   overlay.setCellInfo('Place towers on buildable platforms before the wave hits.');
   game.reset();
 }

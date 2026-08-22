@@ -50,11 +50,11 @@ export function createChrome(handlers: OverlayHandlers): Chrome {
   const views = el('div', 'hk-views');
   views.setAttribute('role', 'group');
   views.setAttribute('aria-label', 'Camera view');
-  const viewNames = ['Tactical', 'Cinematic', 'Overhead', 'Action', 'Trench'];
+  const viewNames = ['Overhead', 'Trench', 'Tactical', 'Action', 'Cinematic'];
   const viewBtns = [0, 1, 2, 3, 4].map((i) => {
     const b = el('button', 'hk-view-btn', String(i + 1));
     b.title = `${viewNames[i]} camera view`;
-    if (i === 2) b.classList.add('is-active'); // default view #3 (Overhead)
+    if (i === 0) b.classList.add('is-active'); // default view #1 (Overhead)
     // delegate only — the highlight is updated via setActiveView so keyboard and
     // swipe stay in sync through the same path (see the composer / main.ts).
     b.addEventListener('click', () => handlers.onSetView(i));
