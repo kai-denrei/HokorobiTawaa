@@ -317,6 +317,12 @@ export class Enemy extends Unit {
     }
     this.total = this.cum[this.cum.length - 1] || 1;
     this.dist = ((startDist % this.total) + this.total) % this.total;
+    // Place at the path start immediately. Position is otherwise first set in
+    // update(), which runs BEFORE enemies are spawned each frame (spawn happens
+    // in onTick, after the unit-update loop) — so without this a new enemy would
+    // render one frame at the world origin (the board centre).
+    const p0 = path[0]!;
+    this.object.position.set(p0.x, this.restY, p0.z);
   }
 
   /** Apply damage; die at 0 HP, otherwise thin the dot cloud to show damage.
