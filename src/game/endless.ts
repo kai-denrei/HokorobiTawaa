@@ -6,6 +6,7 @@ import type { SpawnGroup } from './game';
 
 /** Composition for a 0-based `waveIndex` (call for indices >= 12 → wave 13+). */
 export function endlessWave(waveIndex: number, enemyKeys: string[]): SpawnGroup[] {
+  if (enemyKeys.length === 0) return [];
   const depth = Math.max(0, waveIndex - 11); // 1 at wave 13, 2 at 14, ...
   // total budget grows ~linearly; variety grows slowly (up to all keys)
   const budget = 14 + depth * 4;
@@ -14,6 +15,7 @@ export function endlessWave(waveIndex: number, enemyKeys: string[]): SpawnGroup[
   const picks: string[] = [];
   for (let i = 0; i < variety; i++) picks.push(enemyKeys[(depth + i) % enemyKeys.length]!);
 
+  // floor: actual count is per*variety, slightly under budget — intentional
   const per = Math.max(3, Math.floor(budget / variety));
   const interval = Math.max(0.3, 0.75 - depth * 0.015); // spawns speed up with depth
   return picks.map((key) => ({ key, count: per, interval }));
